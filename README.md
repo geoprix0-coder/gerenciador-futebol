@@ -29,7 +29,7 @@ A promoção ou o rebaixamento, por si só, não altera a força de um clube.
 
 A primeira versão usa HTML, CSS e JavaScript sem dependências de build, para facilitar testes e publicação estática. Os dados do protótipo ficam no armazenamento local do navegador; isso ainda não é um banco de dados compartilhado entre dispositivos.
 
-### Executar
+### Temporada inicial importada\n\nA base inicial inclui os 20 participantes da Série A e os 20 participantes da Série B de 2026, com estado/UF e vínculo à divisão. Os clubes ficam em um cadastro compartilhado e as inscrições ficam registradas dentro da temporada. O regulamento da simulação permanece como “A definir”; os regulamentos reais não são aplicados automaticamente. Fontes de conferência: páginas e documentos oficiais da CBF para a Série A e a Série B de 2026.\n\n### Executar
 
 Abra `index.html` em um navegador. Para publicar, o repositório poderá ser configurado no GitHub Pages.
 
@@ -37,7 +37,7 @@ Abra `index.html` em um navegador. Para publicar, o repositório poderá ser con
 
 1. Estrutura da aplicação e navegação.
 2. Cadastro e edição de clubes.
-3. Configuração das temporadas da Série A e Série B.
+3. Módulo de temporadas e importação inicial dos 40 participantes de 2026 (Série A e Série B).
 4. Geração de calendário e classificação.
 5. Motor de simulação e evolução interna dos ratings.
 6. Histórico e estatísticas.
