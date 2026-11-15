@@ -18,8 +18,16 @@ function initialData(){
  return {clubs,seasons:[{id:'season-2026',year:2026,status:'Preparação',createdAt:new Date().toISOString(),competitions:[{id:'serie-a',name:'Campeonato Brasileiro · Série A',division:'A',participants:a,format:'A definir'},{id:'serie-b',name:'Campeonato Brasileiro · Série B',division:'B',participants:b,format:'A definir'}]}]};
 }
 let data=JSON.parse(localStorage.getItem(STORE)||'null');
-if(!data||!Array.isArray(data.clubs)||!Array.isArray(data.seasons)||!data.seasons.length){data=initialData();save();}
-let clubs=data.clubs,seasons=data.seasons;
+let clubs=[],seasons=[];
+if(!data||!Array.isArray(data.clubs)||!Array.isArray(data.seasons)||!data.seasons.length){
+ data=initialData();
+ clubs=data.clubs;
+ seasons=data.seasons;
+ save();
+}else{
+ clubs=data.clubs;
+ seasons=data.seasons;
+}
 const view=document.querySelector('#view'),title=document.querySelector('#page-title');
 const labels={inicio:'Painel inicial',competicoes:'Competições',clubes:'Clubes',temporadas:'Temporadas',partidas:'Partidas',classificacao:'Classificação',historico:'Histórico'};
 function save(){data={clubs,seasons};localStorage.setItem(STORE,JSON.stringify(data));}
