@@ -57,7 +57,25 @@ function renderClubs(){
  document.querySelector('#club-form').addEventListener('submit',e=>{e.preventDefault();const name=document.querySelector('#club-name').value.trim(),state=document.querySelector('#club-state').value.trim().toUpperCase();if(!name)return;if(clubs.some(c=>slugify(c.name)===slugify(name))){alert('Este clube já está cadastrado.');return;}clubs.push({id:uid(),name,state,slug:slugify(name)});save();renderClubs();});
 }
 function renderCompetitions(){
- view.innerHTML='<div class="panel"><div class="panel-head"><h3>Competições cadastradas</h3><span class="tag">SÉRIE A + SÉRIE B</span></div><p class="muted">As competições pertencem a cada temporada. O regulamento será definido por temporada, sem impor automaticamente as regras reais da CBF à simulação.</p>'+seasons.map(s=>'<h3 class="season-heading">'+s.year+'</h3>'+s.competitions.map(c=>'<div class="competition-row"><div><strong>'+esc(c.name)+'</strong><small>'+c.participants.length+' participantes · Formato: '+esc(c.format)+'</small></div><span class="tag">'+esc(s.status)+'</span></div>').join('')).join('')+'</div>';
+ view.innerHTML='<div class="panel"><div class="panel-head"><h3>Competições cadastradas</h3><span class="tag">SÉRIE A + SÉRIE B</span></div><p class="muted">Clique em uma competição para abrir sua página, consultar a classificação, os jogos e os clubes participantes.</p>'+[...seasons].sort((a,b)=>b.year-a.year).map(s=>'<h3 class="season-heading">'+s.year+'</h3>'+s.competitions.map(c=>'<button class="competition-open" data-open-competition="'+s.id+'|'+c.id+'"><span><strong>'+esc(c.name)+'</strong><small>'+c.participants.length+' participantes · Formato: '+esc(c.format)+'</small></span><span class="competition-open-action">Abrir competição →</span></button>').join('')).join('')+'</div>';
+ view.querySelectorAll('[data-open-competition]').forEach(b=>b.addEventListener('click',()=>{const [seasonId,competitionId]=b.dataset.openCompetition.split('|');renderCompetitionDetail(seasonId,competitionId);}));
+}
+function renderCompetitionDetail(seasonId,competitionId,section='table'){
+ const season=seasons.find(s=>s.id===seasonId),competition=season?.competitions.find(c=>c.id===competitionId);if(!season||!competition)return renderCompetitions();
+ const participants=competition.participants.map(getClub).filter(Boolean).sort((a,b)=>a.name.localeCompare(b.name,'pt-BR'));
+ const tabs=[['table','Classificação'],['games','Jogos'],['clubs','Clubes']];
+ let content='';
+ if(section==='table'){
+  content='<div class="table-wrap"><table class="standings"><thead><tr><th>#</th><th>Clube</th><th>P</th><th>J</th><th>V</th><th>E</th><th>D</th><th>GP</th><th>GC</th><th>SG</th></tr></thead><tbody>'+participants.map((club,i)=>'<tr><td>'+(i+1)+'</td><td class="team-name">'+esc(club.name)+'</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td></tr>').join('')+'</tbody></table></div><p class="muted">A classificação será atualizada automaticamente quando os jogos forem cadastrados e simulados.</p>';
+ }else if(section==='games'){
+  content='<div class="empty">Ainda não há jogos cadastrados para esta competição. O calendário e as partidas serão exibidos aqui quando forem criados.</div>';
+ }else{
+  content='<div class="club-list">'+participants.map(club=>'<div class="club"><span>'+esc(club.name)+(club.state?' · '+esc(club.state):'')+'</span></div>').join('')+'</div>';
+  if(!participants.length)content='<div class="empty">Nenhum clube inscrito nesta competição.</div>';
+ }
+ view.innerHTML='<div class="competition-detail-head"><button class="btn secondary" id="back-competitions">← Voltar às competições</button><span class="tag">TEMPORADA '+season.year+' · '+esc(season.status)+'</span></div><div class="panel"><div class="panel-head"><div><span class="eyebrow">CAMPEONATO BRASILEIRO</span><h2>'+esc(competition.name)+'</h2></div><span class="tag">'+participants.length+' CLUBES</span></div><div class="competition-tabs">'+tabs.map(([key,label])=>'<button class="competition-tab '+(section===key?'active':'')+'" data-competition-tab="'+key+'">'+label+'</button>').join('')+'</div><div class="competition-section">'+content+'</div></div>';
+ document.querySelector('#back-competitions').addEventListener('click',renderCompetitions);
+ view.querySelectorAll('[data-competition-tab]').forEach(b=>b.addEventListener('click',()=>renderCompetitionDetail(seasonId,competitionId,b.dataset.competitionTab)));
 }
 function renderSeasons(){
  view.innerHTML=`<div class="panel"><div class="panel-head"><h3>Temporadas</h3><span class="tag">${seasons.length} CADASTRADAS</span></div><p class="muted">Cada temporada mantém suas próprias competições, participantes e regulamentos. Criar uma nova temporada não altera as anteriores.</p><form id="season-form" class="form-row"><div class="field"><label for="season-year">Ano da nova temporada</label><input id="season-year" type="number" min="2026" max="2100" value="${Math.max(2027,...seasons.map(s=>s.year+1))}" required></div><div class="field"><label>Participantes iniciais</label><select id="season-copy"><option value="copy">Copiar participantes da temporada mais recente</option><option value="empty">Começar com competições vazias</option></select></div><button class="btn" type="submit">Criar temporada</button></form></div>
