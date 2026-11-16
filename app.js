@@ -58,12 +58,17 @@ function render(page='inicio'){
  else {const desc={partidas:'As partidas serão geradas pelo calendário e terão resultados simulados automaticamente.',classificacao:'A classificação será calculada automaticamente a partir dos resultados das partidas.',historico:'As temporadas concluídas e as avaliações dos clubes ficarão registradas aqui.'};view.innerHTML='<div class="panel"><h3>'+labels[page]+'</h3><p class="muted">'+desc[page]+'</p><div class="empty">Este módulo será desenvolvido em uma próxima etapa.</div></div>';}
 }
 function resetTestMatches(){
- const hasTestData=seasons.some(s=>s.competitions.some(c=>Array.isArray(c.rounds)&&c.rounds.length));
- if(!hasTestData){alert('Ainda não existem calendários ou resultados para resetar.');return;}
- if(!confirm('Isso apagará todos os calendários e resultados gerados em todas as temporadas e restaurará a força inicial dos clubes. Os clubes e participantes serão mantidos. Continuar?'))return;
- seasons.forEach(s=>{s.competitions.forEach(c=>{delete c.rounds;delete c.playoffs;});s.status='Preparação';});
+ const hasTestData=seasons.some(s=>s.year!==2026||s.countryAdvancements||s.competitions.some(c=>(Array.isArray(c.rounds)&&c.rounds.length)||c.playoffs));
+ if(!hasTestData){alert('O sistema já está no estado inicial da temporada de 2026.');return;}
+ if(!confirm('Isso apagará todos os calendários, resultados, mata-matas e temporadas posteriores a 2026. O sistema voltará à temporada de 2026 e restaurará a força inicial dos clubes. Os cadastros dos clubes e os participantes de 2026 serão mantidos. Continuar?'))return;
+ seasons=seasons.filter(s=>s.year===2026);
+ seasons.forEach(s=>{
+  delete s.countryAdvancements;
+  s.competitions.forEach(c=>{delete c.rounds;delete c.playoffs;});
+  s.status='Preparação';
+ });
  clubs.forEach(club=>{initializeClubRating(club);club.overall=club.initialRating.overall;club.attack=club.initialRating.attack;club.defense=club.initialRating.defense;});
- save();render('inicio');alert('Calendários, resultados e alterações de força foram resetados.');
+ save();render('inicio');alert('O sistema voltou à temporada de 2026. Temporadas futuras, calendários, resultados, mata-matas e alterações de força foram resetados.');
 }
 function renderHome(){
  const season=latestSeason();
@@ -72,7 +77,7 @@ function renderHome(){
  <div class="grid"><div class="card"><small>CLUBES CADASTRADOS</small><strong>${clubs.length}</strong></div><div class="card"><small>COMPETIÇÕES INICIAIS</small><strong>02</strong></div><div class="card"><small>TEMPORADAS CADASTRADAS</small><strong>${seasons.length}</strong></div></div>
  <div class="panel"><div class="panel-head"><h3>Primeira temporada · ${season.year}</h3><span class="tag">${esc(season.status)}</span></div>${season.competitions.map(c=>`<div class="competition-row"><div><strong>${esc(c.name)}</strong><small>${c.participants.length} clubes · Formato: ${esc(c.format)}</small></div><span class="tag">Cadastrada</span></div>`).join('')}</div>
  <div class="panel"><h3>Regra de evolução dos clubes</h3><p class="muted">A força muda exclusivamente pelos resultados simulados. Promoção e rebaixamento não alteram ratings automaticamente.</p></div>
- <div class="panel reset-panel"><div><h3>Ferramentas da fase de testes</h3><p class="muted">Apaga calendários e resultados simulados e restaura as forças iniciais. Clubes e participantes serão preservados.</p></div><button class="btn danger" id="reset-test-games">Resetar jogos de teste</button></div>`;
+ <div class="panel reset-panel"><div><h3>Ferramentas da fase de testes</h3><p class="muted">Apaga tudo que foi simulado, remove as temporadas posteriores e retorna o sistema a 2026. Os clubes e os participantes de 2026 serão preservados.</p></div><button class="btn danger" id="reset-test-games">Resetar jogos de teste</button></div>`;
  document.querySelector('#reset-test-games').addEventListener('click',resetTestMatches);
 }
 function renderClubDetail(clubId,back={type:'clubs'}){
