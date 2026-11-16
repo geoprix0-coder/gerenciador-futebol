@@ -22,3 +22,28 @@
 .standings th{color:var(--muted);font-size:10px;letter-spacing:.6px}
 .standings td.team-name{text-align:left;font-weight:600;min-width:150px}
 @media(max-width:600px){.competition-detail-head{align-items:flex-start;flex-direction:column}.competition-open{align-items:flex-start;flex-direction:column}.competition-open-action{white-space:normal}}
+
+/* Club profiles, ratings, rounds and fixtures */
+.club-link{border:0;background:transparent;color:var(--blue);padding:0;font:inherit;font-weight:600;cursor:pointer;text-align:left}
+.club-link:hover{color:var(--accent);text-decoration:underline}
+.rating-grid{display:grid;grid-template-columns:repeat(4,minmax(100px,1fr));gap:12px;align-items:end;margin:14px 0 20px}
+.rating-grid .field{margin:0}
+.rating-bars{display:grid;grid-template-columns:repeat(3,1fr);gap:15px;margin:20px 0}
+.rating-bars>div{background:var(--panel2);padding:13px;border-radius:9px}
+.rating-bars span,.rating-bars strong{display:block;font-size:12px}
+.rating-bars strong{margin:5px 0 9px;color:var(--accent)}
+.rating-bars i{display:block;height:7px;background:#0b1422;border-radius:10px;overflow:hidden}
+.rating-bars b{display:block;height:100%;background:var(--accent);border-radius:10px}
+.club-memberships-title{margin-top:24px!important}
+.round-actions{display:flex;justify-content:space-between;align-items:center;gap:15px;flex-wrap:wrap;margin:8px 0 18px}
+.round-controls{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.round-controls label{font-size:11px;color:var(--muted)}
+.round-controls select{padding:9px}
+.round-card{border:1px solid var(--line);border-radius:10px;margin:12px 0;overflow:hidden}
+.round-title{display:flex;justify-content:space-between;align-items:center;padding:12px 14px;background:var(--panel2)}
+.round-title strong{font-size:13px}
+.fixture{display:grid;grid-template-columns:minmax(0,1fr) 72px minmax(0,1fr);gap:10px;align-items:center;padding:12px 14px;border-top:1px solid var(--line)}
+.fixture-team{min-width:0}
+.fixture-team.away{text-align:right}
+.score{text-align:center;font:800 14px Manrope}
+@media(max-width:700px){.rating-grid{grid-template-columns:1fr 1fr}.rating-bars{grid-template-columns:1fr}.fixture{grid-template-columns:minmax(0,1fr) 55px minmax(0,1fr);gap:5px;padding:10px 8px}.fixture-team .club-link{font-size:11px}.round-actions{align-items:flex-start;flex-direction:column}}
