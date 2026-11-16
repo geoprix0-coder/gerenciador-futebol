@@ -19,6 +19,10 @@ const URUGUAY_PRIMERA_2026=[
  ['Juventud','Canelones'],['Liverpool','Montevideo'],['Montevideo City Torque','Montevideo'],['Montevideo Wanderers','Montevideo'],
  ['Nacional','Montevideo'],['Peñarol','Montevideo'],['Progreso','Montevideo'],['Racing','Montevideo']
 ];
+const URUGUAY_INTERMEDIO_2026={
+ A:['Peñarol','Cerro Largo','Racing','Liverpool','Central Español','Cerro','Defensor Sporting','Boston River'],
+ B:['Montevideo City Torque','Nacional','Deportivo Maldonado','Juventud','Albion','Montevideo Wanderers','Danubio','Progreso']
+};
 const URUGUAY_SEGUNDA_2026={
  A:[['Huracán','Montevideo'],['Atenas','Maldonado'],['Tacuarembó','Tacuarembó'],['La Luz','Montevideo'],['Uruguay Montevideo','Montevideo'],['Cerrito','Montevideo'],['Fénix','Montevideo']],
  B:[['River Plate','Montevideo'],['Oriental','Canelones'],['Rentistas','Montevideo'],['Plaza Colonia','Colonia'],['Paysandú','Paysandú'],['Miramar Misiones','Montevideo'],['Colón','Montevideo']]
@@ -97,8 +101,8 @@ function ensureUruguay2026(){
  const make=(id,name,division,format,participants,extra={})=>({id,name,country:'Uruguai',division,format,participants,...extra});
  existing.competitions.push(
   make('uru-primera-apertura-2026','Liga AUF Uruguaya · Torneo Apertura','Primera División','2026 · 16 clubes · 15 rodadas · turno único',primera,{uruguayType:'primera-apertura',singleRound:true}),
-  make('uru-primera-intermedio-a-2026','Torneo Intermedio · Série A','Torneo Intermedio','2026 · 8 clubes · 7 rodadas · turno único',primera.slice(0,8),{uruguayType:'intermedio-serie',singleRound:true}),
-  make('uru-primera-intermedio-b-2026','Torneo Intermedio · Série B','Torneo Intermedio','2026 · 8 clubes · 7 rodadas · turno único',primera.slice(8),{uruguayType:'intermedio-serie',singleRound:true}),
+  make('uru-primera-intermedio-a-2026','Torneo Intermedio · Série A','Torneo Intermedio','2026 · 8 clubes · 7 rodadas · turno único',ids(URUGUAY_INTERMEDIO_2026.A.map(name=>[name,URUGUAY_PRIMERA_2026.find(x=>x[0]===name)?.[1]||''])),{uruguayType:'intermedio-serie',singleRound:true}),
+  make('uru-primera-intermedio-b-2026','Torneo Intermedio · Série B','Torneo Intermedio','2026 · 8 clubes · 7 rodadas · turno único',ids(URUGUAY_INTERMEDIO_2026.B.map(name=>[name,URUGUAY_PRIMERA_2026.find(x=>x[0]===name)?.[1]||''])),{uruguayType:'intermedio-serie',singleRound:true}),
   make('uru-primera-clausura-2026','Liga AUF Uruguaya · Torneo Clausura','Primera División','2026 · 16 clubes · 15 rodadas · turno único',primera,{uruguayType:'primera-clausura',singleRound:true}),
   make('uru-segunda-competencia-a-2026','Torneo Competencia · Série A','Segunda División Profesional','2026 · 7 clubes · 7 rodadas · turno único',segundaA,{uruguayType:'competencia-serie',singleRound:true}),
   make('uru-segunda-competencia-b-2026','Torneo Competencia · Série B','Segunda División Profesional','2026 · 7 clubes · 7 rodadas · turno único',segundaB,{uruguayType:'competencia-serie',singleRound:true}),
