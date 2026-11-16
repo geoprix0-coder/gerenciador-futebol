@@ -498,8 +498,18 @@ function uruguaySimulateMatch(m){
 function uruguayCreateAccessPlayoffs(competition){
  const s=getStandings(competition);if(s.length<6)return false;
  const tie=(a,b,name)=>({name,teamA:a,teamB:b,legs:[{home:b,away:a,homeGoals:null,awayGoals:null},{home:a,away:b,homeGoals:null,awayGoals:null}],penaltyWinner:null});
- competition.uruguayAccess={promotedDirect:[s[0].id,s[1].id],semifinals:[tie(s[2].id,s[5].id,'Semifinal 1 · 3º × 6º'),tie(s[3].id,s[4].id,'Semifinal 2 · 4º × 5º')],final:null,completed:false,promotedThird:null};
+ competition.uruguayAccess={promotedDirect:[s[0].id,s[1].id],seedTable:s.slice(0,6).map(r=>r.id),semifinals:[tie(s[2].id,s[5].id,'Semifinal 1 · 3º ('+getClub(s[2].id).name+') × 6º ('+getClub(s[5].id).name+')'),tie(s[3].id,s[4].id,'Semifinal 2 · 4º ('+getClub(s[3].id).name+') × 5º ('+getClub(s[4].id).name+')')],final:null,completed:false,promotedThird:null};
  return true;
+}
+function uruguayEnsureAccessPlayoffs(competition){
+ const p=competition?.uruguayAccess;if(!p)return false;
+ const s=getStandings(competition);if(s.length<6)return false;
+ const expected=s.slice(0,6).map(r=>r.id),saved=p.seedTable||[...(p.promotedDirect||[]),...(p.semifinals||[]).flatMap(t=>[t.teamA,t.teamB])];
+ const same=(a,b)=>a.length===b.length&&a.every((id,i)=>id===b[i]);
+ if(same(expected,saved))return false;
+ const played=[...(p.semifinals||[]),...(p.final?[p.final]:[])].some(t=>(t.legs||[]).some(m=>m.homeGoals!==null||m.awayGoals!==null));
+ if(played||p.completed)return false;
+ return uruguayCreateAccessPlayoffs(competition);
 }
 function uruguayAccessWinner(t){
  if(!t||t.legs.some(m=>m.homeGoals===null||m.awayGoals===null))return null;
@@ -835,6 +845,7 @@ function renderCompetitionDetail(seasonId,competitionId,section='table'){
    content+='<h3 class="season-heading">Tabela de promedios · rebaixamento</h3><p class="muted">Média de pontos por jogo nas duas temporadas mais recentes disponíveis ('+esc(avg.years.join(' e '))+'). Em 2026, considera apenas a temporada disponível. Os três piores promedios serão rebaixados.</p><div class="table-wrap"><table class="standings"><thead><tr><th>#</th><th>Clube</th><th>Pontos</th><th>Jogos</th><th>Promedio</th></tr></thead><tbody>'+avg.rows.map((r,i)=>'<tr class="'+(decision.ready&&decision.relegated.includes(r.id)?'zone-relegation':'')+'"><td>'+(i+1)+'</td><td class="team-name">'+clubLink(getClub(r.id),getClub(r.id)?.name||'')+'</td><td>'+r.points+'</td><td>'+r.played+'</td><td>'+(r.average===null?'—':r.average.toFixed(3))+'</td></tr>').join('')+'</tbody></table></div><p class="muted">'+(decision.ready?'Três rebaixados previstos: '+decision.relegated.map(id=>esc(getClub(id)?.name||'')).join(', '):'Aguardando partidas para calcular os promedios.')+'</p>';
   }
   else if(competition.uruguayType==='segunda-regular'){
+   if(competition.uruguayAccess)uruguayEnsureAccessPlayoffs(competition);
    const p=competition.uruguayAccess;
    content='<div class="table-legend"><span class="legend-item access">Verde · 1º e 2º (acesso direto) e vencedor do playoff</span><span class="legend-item playoff">Amarelo · 3º ao 6º enquanto disputa o playoff</span></div><div class="table-wrap"><table class="standings"><thead><tr><th>#</th><th>Clube</th><th>P</th><th>J</th><th>V</th><th>E</th><th>D</th><th>GP</th><th>GC</th><th>SG</th></tr></thead><tbody>'+standings.map((r,i)=>'<tr class="'+(i<2||p?.promotedThird===r.id?'zone-access':i<6?'zone-playoff':'')+'"><td>'+(i+1)+'</td><td class="team-name">'+clubLink(r.club,r.club.name)+'</td><td>'+r.points+'</td><td>'+r.played+'</td><td>'+r.wins+'</td><td>'+r.draws+'</td><td>'+r.losses+'</td><td>'+r.gf+'</td><td>'+r.ga+'</td><td>'+(r.gf-r.ga)+'</td></tr>').join('')+'</tbody></table></div>';
   }
@@ -853,6 +864,7 @@ function renderCompetitionDetail(seasonId,competitionId,section='table'){
    }
   }
   if(competition.uruguayType==='segunda-regular'&&regularDone){
+   if(competition.uruguayAccess)uruguayEnsureAccessPlayoffs(competition);
    const p=competition.uruguayAccess;
    if(!p)content+='<div class="playoff-panel"><h3>Playoff pelo terceiro acesso</h3><p class="muted">Os dois primeiros colocados sobem diretamente. Do 3º ao 6º disputam a terceira vaga em semifinais e final, todas em ida e volta.</p><button class="btn" id="create-uruguay-access">Gerar confrontos do acesso</button></div>';
    else{
