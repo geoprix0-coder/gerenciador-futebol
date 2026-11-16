@@ -123,3 +123,10 @@
  .nav-submenu{flex-direction:row;flex-wrap:wrap;margin:3px 0 8px 8px;padding:4px 0 4px 8px}
  .nav-subitem{width:auto;white-space:nowrap;padding:8px 10px}
 }
+
+
+/* Continental qualification zones */
+.standings tr.zone-libertadores{background:rgba(36,184,125,.20);box-shadow:inset 4px 0 #29c58b}
+.standings tr.zone-sudamericana{background:rgba(63,132,226,.20);box-shadow:inset 4px 0 #5799ed}
+.legend-item.libertadores{background:rgba(36,184,125,.20);color:#67e1ac}
+.legend-item.sudamericana{background:rgba(63,132,226,.20);color:#83b5ff}
