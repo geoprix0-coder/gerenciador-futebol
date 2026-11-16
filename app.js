@@ -88,11 +88,63 @@ function renderClubs(){
  view.querySelectorAll('[data-open-club]').forEach(b=>b.addEventListener('click',()=>renderClubDetail(b.dataset.openClub)));
  document.querySelector('#club-form').addEventListener('submit',e=>{e.preventDefault();const name=document.querySelector('#club-name').value.trim(),state=document.querySelector('#club-state').value.trim().toUpperCase();if(!name)return;if(clubs.some(c=>slugify(c.name)===slugify(name))){alert('Este clube já está cadastrado.');return;}const club={id:uid(),name,state,slug:slugify(name)};initializeClubRating(club);clubs.push(club);save();renderClubs();});
 }
+function countrySeason(country){
+ return [...seasons].filter(season=>season.competitions.some(c=>(c.country||'Brasil')===country)).sort((a,b)=>b.year-a.year)[0]||null;
+}
+function countrySeasonReady(country,season){
+ if(!season||season.countryAdvancements?.[country])return false;
+ const competitions=season.competitions.filter(c=>(c.country||'Brasil')===country);
+ if(!competitions.length)return false;
+ return competitions.every(c=>{
+  const rounds=c.rounds||[];
+  const regularDone=rounds.length>0&&rounds.every(r=>r.matches.length>0&&r.matches.every(m=>m.homeGoals!==null&&m.awayGoals!==null));
+  if(!regularDone)return false;
+  if(country==='Brasil'&&c.division==='B'&&c.participants.length>=6){
+   const ties=c.playoffs?.ties||[];
+   return ties.length>0&&ties.every(t=>!!playoffWinner(t));
+  }
+  return true;
+ });
+}
+function advanceCountrySeason(country,sourceSeasonId){
+ const source=seasons.find(s=>s.id===sourceSeasonId);
+ if(!countrySeasonReady(country,source)){alert('Ainda existem jogos pendentes neste país.');return;}
+ const sourceComps=source.competitions.filter(c=>(c.country||'Brasil')===country);
+ const divisions={A:sourceComps.find(c=>c.division==='A'),B:sourceComps.find(c=>c.division==='B')};
+ const nextParticipants=new Map(sourceComps.map(c=>[c.id,[...c.participants]]));
+ if(country==='Brasil'&&divisions.A&&divisions.B){
+  const relegated=getStandings(divisions.A).slice(-4).map(r=>r.id);
+  const bStandings=getStandings(divisions.B);
+  const promoted=[...bStandings.slice(0,2).map(r=>r.id),...(divisions.B.playoffs?.ties||[]).map(playoffWinner).filter(Boolean)];
+  const uniquePromoted=[...new Set(promoted)];
+  nextParticipants.set(divisions.A.id,[...divisions.A.participants.filter(id=>!relegated.includes(id)),...uniquePromoted]);
+  nextParticipants.set(divisions.B.id,[...divisions.B.participants.filter(id=>!uniquePromoted.includes(id)),...relegated]);
+ }
+ const nextYear=source.year+1;
+ let target=seasons.find(s=>s.year===nextYear);
+ if(target&&target.competitions.some(c=>(c.country||'Brasil')===country)){
+  alert('Já existem competições deste país na temporada '+nextYear+'. Confira a aba Temporadas antes de avançar.');
+  return;
+ }
+ if(!target){target={id:uid(),year:nextYear,status:'Preparação',createdAt:new Date().toISOString(),competitions:[]};seasons.push(target);}
+ source.countryAdvancements=source.countryAdvancements||{};
+ source.countryAdvancements[country]=nextYear;
+ sourceComps.forEach(comp=>{
+  target.competitions.push({id:uid(),name:comp.name,country,division:comp.division||'',participants:nextParticipants.get(comp.id)||[...comp.participants],format:comp.format||'A definir'});
+ });
+ save();renderCompetitions();
+ alert(country==='Brasil'&&divisions.A&&divisions.B?'Temporada '+nextYear+' criada! Os quatro últimos da Série A foram rebaixados, e os quatro promovidos da Série B foram definidos. As forças acumuladas dos clubes foram preservadas.':'Temporada '+nextYear+' criada! Os participantes e as forças acumuladas dos clubes foram preservados.');
+}
 function renderCompetitions(){
  const countries=[...new Set(seasons.flatMap(s=>s.competitions.map(c=>c.country||'Brasil')))].sort((a,b)=>a.localeCompare(b,'pt-BR'));
- const countrySections=countries.map(country=>'<section class="country-group"><div class="country-heading"><h2>'+esc(country)+'</h2><span class="tag">'+seasons.reduce((n,s)=>n+s.competitions.filter(c=>(c.country||'Brasil')===country).length,0)+' COMPETIÇÕES</span></div>'+[...seasons].sort((a,b)=>b.year-a.year).map(s=>{const list=s.competitions.filter(c=>(c.country||'Brasil')===country);return list.length?'<h3 class="season-heading">Temporada '+s.year+'</h3>'+list.map(c=>'<button class="competition-open" data-open-competition="'+s.id+'|'+c.id+'"><span><strong>'+esc(c.name)+'</strong><small>'+c.participants.length+' participantes · Formato: '+esc(c.format)+'</small></span><span class="competition-open-action">Abrir competição →</span></button>').join(''):'';}).join('')+'</section>').join('');
- view.innerHTML='<div class="panel"><div class="panel-head"><h3>Competições por país</h3><span class="tag">'+countries.length+' PAÍS(ES)</span></div><p class="muted">As competições estão organizadas pelo país ao qual pertencem. Selecione uma para consultar classificação, jogos e clubes participantes.</p>'+(countrySections||'<div class="empty">Nenhuma competição cadastrada.</div>')+'</div>';
+ const countrySections=countries.map(country=>{
+  const current=countrySeason(country);
+  const canAdvance=countrySeasonReady(country,current);
+  return '<section class="country-group"><div class="country-heading"><h2>'+esc(country)+'</h2><div class="country-heading-actions"><span class="tag">'+seasons.reduce((n,s)=>n+s.competitions.filter(c=>(c.country||'Brasil')===country).length,0)+' COMPETIÇÕES</span>'+(canAdvance?'<button class="btn country-advance" data-advance-country="'+esc(country)+'" data-source-season="'+current.id+'">Avançar para temporada seguinte →</button>':'')+'</div></div>'+[...seasons].sort((a,b)=>b.year-a.year).map(s=>{const list=s.competitions.filter(c=>(c.country||'Brasil')===country);return list.length?'<h3 class="season-heading">Temporada '+s.year+'</h3>'+list.map(c=>'<button class="competition-open" data-open-competition="'+s.id+'|'+c.id+'"><span><strong>'+esc(c.name)+'</strong><small>'+c.participants.length+' participantes · Formato: '+esc(c.format)+'</small></span><span class="competition-open-action">Abrir competição →</span></button>').join(''):'';}).join('')+'</section>';
+ }).join('');
+ view.innerHTML='<div class="panel"><div class="panel-head"><h3>Competições por país</h3><span class="tag">'+countries.length+' PAÍS(ES)</span></div><p class="muted">O botão de avanço aparece quando todas as partidas e fases decisivas dos campeonatos daquele país estiverem concluídas.</p>'+(countrySections||'<div class="empty">Nenhuma competição cadastrada.</div>')+'</div>';
  view.querySelectorAll('[data-open-competition]').forEach(b=>b.addEventListener('click',()=>{const [seasonId,competitionId]=b.dataset.openCompetition.split('|');renderCompetitionDetail(seasonId,competitionId);}));
+ view.querySelectorAll('[data-advance-country]').forEach(b=>b.addEventListener('click',()=>advanceCountrySeason(b.dataset.advanceCountry,b.dataset.sourceSeason)));
 }
 function buildSchedule(competition){
  const teams=[...competition.participants];if(teams.length<2)return null;
