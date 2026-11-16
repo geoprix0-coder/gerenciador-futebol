@@ -168,7 +168,37 @@ function advanceCountrySeason(country,sourceSeasonId){
  const sourceComps=source.competitions.filter(c=>(c.country||'Brasil')===country);
  const divisions={A:sourceComps.find(c=>c.division==='A'),B:sourceComps.find(c=>c.division==='B')};
  const nextParticipants=new Map(sourceComps.map(c=>[c.id,[...c.participants]]));
- if(country==='Argentina'){const first=sourceComps.find(c=>c.argentinaType==='primera'),second=sourceComps.find(c=>c.argentinaType==='nacional');if(first&&second){const decision=argentinaRelegationDecision(source.year);if(!decision.ready){alert(decision.reason);return;}const promoted=[second.argentinaPlayoffs?.promotedDirect,second.argentinaPlayoffs?.promotedReduced].filter(Boolean);if(promoted.length!==2){alert('O mata-mata da Primera Nacional ainda não definiu os dois clubes promovidos.');return;}const relegated=decision.relegated;const allA=[...first.participants.filter(id=>!relegated.includes(id)),...promoted];sourceComps.filter(c=>c.argentinaType==='primera').forEach(c=>nextParticipants.set(c.id,[...allA]));nextParticipants.set(second.id,[...second.participants.filter(id=>!promoted.includes(id)),...relegated]);}}
+ const nextZones=new Map();
+ if(country==='Argentina'){
+  const first=sourceComps.find(c=>c.argentinaType==='primera'),second=sourceComps.find(c=>c.argentinaType==='nacional');
+  if(first&&second){
+   const decision=argentinaRelegationDecision(source.year);
+   if(!decision.ready){alert(decision.reason);return;}
+   const promoted=[second.argentinaPlayoffs?.promotedDirect,second.argentinaPlayoffs?.promotedReduced].filter(Boolean);
+   if(promoted.length!==2){alert('O mata-mata da Primera Nacional ainda não definiu os dois clubes promovidos.');return;}
+   const relegated=decision.relegated;
+   const replaceInZones=(competition,outgoing,incoming)=>{
+    const zones={A:[...(competition.zones?.A||[])],B:[...(competition.zones?.B||[])]};
+    outgoing.forEach((id,index)=>{
+     let zone=Object.keys(zones).find(key=>zones[key].includes(id));
+     if(!zone)zone=zones.A.length<=zones.B.length?'A':'B';
+     const position=zones[zone].indexOf(id);
+     if(position>=0)zones[zone][position]=incoming[index];
+     else zones[zone].push(incoming[index]);
+    });
+    return zones;
+   };
+   const primeraZones=replaceInZones(first,relegated,promoted);
+   const nacionalZones=replaceInZones(second,promoted,relegated);
+   sourceComps.filter(c=>c.argentinaType==='primera').forEach(c=>{
+    const zones={A:[...primeraZones.A],B:[...primeraZones.B]};
+    nextZones.set(c.id,zones);
+    nextParticipants.set(c.id,[...zones.A,...zones.B]);
+   });
+   nextZones.set(second.id,nacionalZones);
+   nextParticipants.set(second.id,[...nacionalZones.A,...nacionalZones.B]);
+  }
+ }
  if(country==='Brasil'&&divisions.A&&divisions.B){
   const relegated=getStandings(divisions.A).slice(-4).map(r=>r.id);
   const bStandings=getStandings(divisions.B);
@@ -187,7 +217,7 @@ function advanceCountrySeason(country,sourceSeasonId){
  source.countryAdvancements=source.countryAdvancements||{};
  source.countryAdvancements[country]=nextYear;
  sourceComps.forEach(comp=>{
-  target.competitions.push({...Object.fromEntries(Object.entries(comp).filter(([k])=>!['rounds','playoffs','argentinaPlayoffs'].includes(k))),id:uid(),name:comp.name,country,division:comp.division||'',participants:nextParticipants.get(comp.id)||[...comp.participants],format:comp.format||'A definir'});
+  target.competitions.push({...Object.fromEntries(Object.entries(comp).filter(([k])=>!['rounds','playoffs','argentinaPlayoffs'].includes(k))),id:uid(),name:comp.name,country,division:comp.division||'',participants:nextParticipants.get(comp.id)||[...comp.participants],...(nextZones.has(comp.id)?{zones:nextZones.get(comp.id)}:{}),format:comp.format||'A definir'});
  });
  save();renderCompetitions();
  alert(country==='Brasil'&&divisions.A&&divisions.B?'Temporada '+nextYear+' criada! Os quatro últimos da Série A foram rebaixados, e os quatro promovidos da Série B foram definidos. As forças acumuladas dos clubes foram preservadas.':'Temporada '+nextYear+' criada! Os participantes e as forças acumuladas dos clubes foram preservados.');
