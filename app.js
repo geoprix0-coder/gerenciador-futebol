@@ -141,9 +141,9 @@ function recordInternationalMatch(form){
  if(!home||!away||home.id===away.id||!Number.isInteger(homeGoals)||!Number.isInteger(awayGoals)||homeGoals<0||awayGoals<0||!type){alert('Confira as seleções, o placar e a importância da partida.');return false;}
  let homeOutcome=homeGoals>awayGoals?1:homeGoals<awayGoals?0:0.5;
  let penaltyWinner=null;
- if(homeGoals===awayGoals){
-  const winner=form.penaltyWinner.value;
-  if(winner!=='home'&&winner!=='away'){alert('Em caso de empate com disputa por pênaltis, selecione a seleção vencedora.');return false;}
+ if(homeGoals===awayGoals&&type.id!=='friendly_inside'&&type.id!=='friendly_outside'){
+  const winner=form.penaltyWinner?.value;
+  if(winner!=='home'&&winner!=='away'){alert('Para esta partida eliminatória, selecione a seleção vencedora nos pênaltis.');return false;}
   homeOutcome=winner==='home'?0.75:0.5;
   penaltyWinner=winner==='home'?home.id:away.id;
  }
