@@ -1069,6 +1069,85 @@ function libertadoresMaybeCreateForSeason(source,target){
  comp.libertadoresTies=[libertadoresCreateTie(p1[0],p1[5],'Fase 1 · Confronto 1'),libertadoresCreateTie(p1[1],p1[4],'Fase 1 · Confronto 2'),libertadoresCreateTie(p1[2],p1[3],'Fase 1 · Confronto 3')];
  target.competitions.push(comp);delete target.libertadoresPendingReason;return true;
 }
+
+const LIBERTADORES_COUNTRY_SLOTS={
+ Argentina:{group:[1,2,3,4,5],phase2:[6],phase1:[]},
+ Brasil:{group:[1,2,3,4,5],phase2:[6,7],phase1:[]},
+ 'Bolívia':{group:[1,2],phase2:[3],phase1:[4]},
+ Chile:{group:[1,2],phase2:[3,4],phase1:[]},
+ 'Colômbia':{group:[1,2],phase2:[3,4],phase1:[]},
+ Equador:{group:[1,2],phase2:[3],phase1:[4]},
+ Paraguai:{group:[1,2],phase2:[3],phase1:[4]},
+ Peru:{group:[1,2],phase2:[3],phase1:[4]},
+ Uruguai:{group:[1,2],phase2:[3],phase1:[4]},
+ Venezuela:{group:[1,2],phase2:[3],phase1:[4]}
+};
+function libertadoresLatestQualifyingSeason(){
+ return [...seasons].filter(season=>LIBERTADORES_COUNTRIES.every(country=>season.competitions.some(comp=>comp.country===country))).sort((a,b)=>b.year-a.year)[0]||seasons.find(season=>season.year===2026)||null;
+}
+function libertadoresCountryComplete(country,season){
+ if(!season||!season.competitions.some(comp=>comp.country===country))return false;
+ if(season.countryAdvancements?.[country]===season.year+1)return true;
+ return countrySeasonBlockers(country,season).length===0;
+}
+function libertadoresCountrySlots(country,season){
+ const plan=LIBERTADORES_COUNTRY_SLOTS[country]||{group:[],phase2:[],phase1:[]};
+ const complete=libertadoresCountryComplete(country,season),rows=complete?libertadoresDomesticRows(season,country):[];
+ const items=[];
+ [['Fase de grupos',plan.group],['Fase 2 preliminar',plan.phase2],['Fase 1 preliminar',plan.phase1]].forEach(([phase,positions])=>positions.forEach(position=>{
+  const row=complete?rows[position-1]:null;
+  items.push({country,phase,position,id:row?.id||null,club:row?.club||null,complete:!!row});
+ }));
+ return {complete,items};
+}
+function libertadoresQualificationSnapshot(season){
+ const countries=LIBERTADORES_COUNTRIES.map(country=>({country,...libertadoresCountrySlots(country,season)}));
+ const allComplete=countries.every(item=>item.complete);
+ let extras=[],extraReason='Aguardando a conclusão dos campeonatos nacionais dos dez países.';
+ if(allComplete){
+  const built=libertadoresBuildQualification(season);
+  if(built.ok){extras=(built.qualifiers.extras||[]).map(item=>({...item,phase:'Vaga adicional da edição inaugural'}));extraReason='';}
+  else extraReason=built.reason;
+ }
+ const confirmed=countries.reduce((n,c)=>n+c.items.filter(item=>item.complete).length,0)+extras.length;
+ const total=countries.reduce((n,c)=>n+c.items.length,0)+2;
+ return {countries,allComplete,extras,extraReason,confirmed,total};
+}
+function libertadoresHubSourceOptions(){
+ return [...seasons].filter(season=>LIBERTADORES_COUNTRIES.every(country=>season.competitions.some(comp=>comp.country===country))).sort((a,b)=>b.year-a.year);
+}
+function renderLibertadoresHub(sourceYear=null,tab='spots'){
+ const options=libertadoresHubSourceOptions(),source=options.find(season=>season.year===Number(sourceYear))||libertadoresLatestQualifyingSeason();
+ const editions=seasons.flatMap(season=>season.competitions.filter(comp=>comp.libertadoresCompetition).map(comp=>({season,comp}))).sort((a,b)=>b.comp.libertadoresYear-a.comp.libertadoresYear);
+ title.textContent='CONMEBOL Libertadores';
+ if(!source){
+  view.innerHTML='<div class="competition-detail-head"><button class="btn secondary" id="back-libertadores">← Voltar</button><span class="tag">CONMEBOL</span></div><div class="panel"><h2>Classificação continental</h2><div class="empty">Ainda não há uma temporada nacional cadastrada para acompanhar as vagas.</div></div>';
+  document.querySelector('#back-libertadores').addEventListener('click',()=>{activeCompetitionContinent='América do Sul';render('competicoes');});return;
+ }
+ const targetYear=source.year+1,snapshot=libertadoresQualificationSnapshot(source),editionCards=editions.length?editions.map(({season,comp})=>'<div class="competition-row"><div><strong>CONMEBOL Libertadores · '+comp.libertadoresYear+'</strong><small>'+esc(libertadoresStageLabel(comp.libertadoresStage))+(comp.libertadoresChampion?' · Campeão: '+esc(getClub(comp.libertadoresChampion)?.name||''):' · Em andamento')+'</small></div><button class="btn secondary" data-open-libertadores-edition="'+season.id+'|'+comp.id+'">Abrir edição</button></div>').join(''):'<div class="empty">A primeira edição será disputada em 2027. Ainda não há uma edição em andamento.</div>';
+ const nav=[['spots','Vagas para a próxima edição'],['edition','Edições em disputa'],['history','Histórico de campeões']];
+ let content='';
+ if(tab==='spots'){
+  content='<div class="grid"><div class="card"><small>VAGAS GARANTIDAS</small><strong>'+snapshot.confirmed+' / '+snapshot.total+'</strong></div><div class="card"><small>PAÍSES CONCLUÍDOS</small><strong>'+snapshot.countries.filter(c=>c.complete).length+' / 10</strong></div><div class="card"><small>PRÓXIMA EDIÇÃO</small><strong>'+targetYear+'</strong></div></div><p class="muted">As vagas são confirmadas somente quando todas as competições e fases nacionais exigidas daquele país estiverem concluídas. Posições ainda não confirmadas permanecem em aberto.</p>';
+  content+=snapshot.countries.map(country=>{
+   const entries=country.items.map(item=>'<tr><td>'+item.position+'º</td><td>'+esc(item.phase)+'</td><td>'+(item.club?'<strong>'+esc(item.club.name)+'</strong>':'<span class="muted">'+(country.complete?'Vaga sem clube definido':'Aguardando conclusão do campeonato')+'</span>')+'</td><td>'+(item.club?'<span class="tag">GARANTIDA</span>':'<span class="muted">Pendente</span>')+'</td></tr>').join('');
+   return '<section class="country-group"><div class="country-heading"><div><h2>'+esc(country.country)+'</h2><p class="muted">'+(country.complete?'Campeonato nacional concluído · '+country.items.filter(x=>x.club).length+' vaga(s) preenchida(s)':'Aguardando conclusão das competições nacionais')+'</p></div><span class="tag">'+(country.complete?'CONCLUÍDO':'EM ANDAMENTO')+'</span></div><div class="table-wrap"><table class="standings"><thead><tr><th>Posição</th><th>Fase</th><th>Clube</th><th>Status</th></tr></thead><tbody>'+entries+'</tbody></table></div></section>';
+  }).join('');
+  content+='<section class="playoff-panel"><h3>Vagas adicionais da edição inaugural</h3><p class="muted">'+(snapshot.extras.length?'Vagas adicionais definidas para completar a lista de 47 participantes.':'Essas duas vagas serão preenchidas após a conclusão dos dez campeonatos nacionais, sem retirar as vagas já garantidas por posição.')+'</p>'+(snapshot.extras.length?'<div class="club-list">'+snapshot.extras.map(item=>'<div class="club"><span><strong>'+esc(getClub(item.id)?.name||'Clube')+'</strong><small>'+esc(item.label)+'</small></span><span class="tag">GARANTIDA</span></div>').join('')+'</div>':'<span class="muted">'+esc(snapshot.extraReason)+'</span>')+'</section>';
+ }else if(tab==='edition'){
+  content='<div class="panel"><h2>Edições da CONMEBOL Libertadores</h2><p class="muted">Acompanhe a edição que já começou e acesse suas partidas, classificação e clubes.</p>'+editionCards+'</div>';
+ }else{
+  const winners=editions.filter(({comp})=>comp.libertadoresStage==='completed'&&comp.libertadoresChampion);
+  content='<div class="panel"><h2>Histórico de campeões</h2><p class="muted">Cada campeão ficará registrado ao término da final de sua edição.</p>'+(winners.length?'<div class="season-list">'+winners.map(({comp})=>'<div class="season-card"><div><strong>'+comp.libertadoresYear+' · '+esc(getClub(comp.libertadoresChampion)?.name||'')+'</strong><small>CONMEBOL Libertadores · Campeão</small></div></div>').join('')+'</div>':'<div class="empty">O histórico será preenchido a partir da primeira edição, em 2027.</div>')+'</div>';
+ }
+ const selector=options.length>1?'<label class="season-history-select"><span>Campeonato nacional de referência</span><select id="libertadores-source-year">'+options.map(season=>'<option value="'+season.year+'" '+(season.year===source.year?'selected':'')+'>'+season.year+' · vagas '+(season.year+1)+'</option>').join('')+'</select></label>':'<span class="tag">VAGAS '+targetYear+'</span>';
+ view.innerHTML='<div class="competition-detail-head"><button class="btn secondary" id="back-libertadores">← América do Sul</button><span class="tag">TORNEIO CONTINENTAL · CONMEBOL</span></div><div class="panel"><div class="panel-head"><div><span class="eyebrow">AMÉRICA DO SUL</span><h2>CONMEBOL Libertadores</h2><p class="muted">Classificação nacional, vagas continentais e edições do torneio.</p></div>'+selector+'</div><div class="competition-tabs">'+nav.map(([key,label])=>'<button class="competition-tab '+(tab===key?'active':'')+'" data-libertadores-tab="'+key+'">'+label+'</button>').join('')+'</div><div class="competition-section">'+content+'</div></div>';
+ document.querySelector('#back-libertadores').addEventListener('click',()=>{activeCompetitionContinent='América do Sul';render('competicoes');});
+ const sourceSelect=document.querySelector('#libertadores-source-year');if(sourceSelect)sourceSelect.addEventListener('change',()=>renderLibertadoresHub(sourceSelect.value,tab));
+ view.querySelectorAll('[data-libertadores-tab]').forEach(button=>button.addEventListener('click',()=>renderLibertadoresHub(source.year,button.dataset.libertadoresTab)));
+ view.querySelectorAll('[data-open-libertadores-edition]').forEach(button=>button.addEventListener('click',()=>{const [seasonId,competitionId]=button.dataset.openLibertadoresEdition.split('|');renderCompetitionDetail(seasonId,competitionId);}));
+}
+
 function advanceCountrySeason(country,sourceSeasonId){
  const source=seasons.find(s=>s.id===sourceSeasonId);
  if(!countrySeasonReady(country,source)){alert('Ainda existem jogos pendentes neste país.');return;}
@@ -1290,7 +1369,7 @@ function renderCompetitions(continent=activeCompetitionContinent){
    return '<section class="country-group"><button class="country-toggle" type="button" aria-expanded="false" data-country-toggle><span>'+esc(country)+'</span><span class="country-toggle-icon">＋</span></button><div class="country-content" hidden><div class="country-tools">'+history+actions+'</div>'+pending+'<div class="country-competitions">'+countryBody(country,current)+'</div></div></section>';
   }).join('');
   const libertadoresEntries=continent==='América do Sul'?seasons.flatMap(season=>season.competitions.filter(comp=>comp.libertadoresCompetition).map(comp=>({season,comp}))).sort((a,b)=>b.season.year-a.season.year):[];
-  const continentalHtml=continent==='América do Sul'?'<section class="country-group"><div class="country-heading"><div><h2>Competições continentais</h2><p class="muted">Torneios que reúnem clubes de diferentes países da América do Sul.</p></div></div>'+(libertadoresEntries.length?libertadoresEntries.map(({season,comp})=>'<button class="competition-open" data-open-competition="'+season.id+'|'+comp.id+'"><span><strong>CONMEBOL Libertadores · '+season.year+'</strong><small>'+comp.participants.length+' participantes · '+esc(libertadoresStageLabel(comp.libertadoresStage))+'</small></span><span class="competition-open-action">Abrir competição →</span></button>').join(''):(seasons.find(season=>season.libertadoresPendingReason)?.libertadoresPendingReason?'<div class="empty">A criação da Libertadores está aguardando correções: '+esc(seasons.find(season=>season.libertadoresPendingReason).libertadoresPendingReason)+'</div>':'<div class="empty">A edição de 2027 será criada quando as dez associações da CONMEBOL concluírem o avanço de suas temporadas nacionais de 2026.</div>'))+'</section>':'';
+  const continentalHtml=continent==='América do Sul'?'<section class="country-group"><div class="country-heading"><div><h2>Competições continentais</h2><p class="muted">Torneios que reúnem clubes de diferentes países da América do Sul.</p></div></div><button class="competition-open" data-open-libertadores-hub><span><strong>CONMEBOL Libertadores</strong><small>Vagas da próxima edição · classificação nacional · edições e campeões</small></span><span class="competition-open-action">Abrir competição →</span></button>'+libertadoresEntries.map(({season,comp})=>'<button class="competition-open" data-open-competition="'+season.id+'|'+comp.id+'"><span><strong>CONMEBOL Libertadores · '+season.year+'</strong><small>'+comp.participants.length+' participantes · '+esc(libertadoresStageLabel(comp.libertadoresStage))+'</small></span><span class="competition-open-action">Abrir edição →</span></button>').join('')+'</section>':'';
   view.innerHTML='<div class="panel"><div class="panel-head"><h3>Países · '+esc(continent)+'</h3><span class="tag">'+countries.length+' PAÍS(ES)</span></div><p class="muted">Selecione um país para visualizar seus campeonatos e escolher a temporada.</p>'+continentalHtml+(countrySections||'<div class="empty">Ainda não há países cadastrados neste continente.</div>')+'</div>';
   view.querySelectorAll('[data-country-toggle]').forEach(button=>button.addEventListener('click',()=>{const section=button.closest('.country-group'),body=section.querySelector('.country-content'),open=body.hidden;body.hidden=!open;button.setAttribute('aria-expanded',String(open));button.querySelector('.country-toggle-icon').textContent=open?'−':'＋';}));
   view.querySelectorAll('[data-country-season]').forEach(select=>select.addEventListener('change',()=>{
@@ -1304,6 +1383,7 @@ function renderCompetitions(continent=activeCompetitionContinent){
    section.querySelectorAll('[data-open-competition]').forEach(b=>b.addEventListener('click',()=>{const [seasonId,competitionId]=b.dataset.openCompetition.split('|');renderCompetitionDetail(seasonId,competitionId);}));
   }));
   view.querySelectorAll('[data-open-competition]').forEach(b=>b.addEventListener('click',()=>{const [seasonId,competitionId]=b.dataset.openCompetition.split('|');renderCompetitionDetail(seasonId,competitionId);}));
+  view.querySelector('[data-open-libertadores-hub]')?.addEventListener('click',()=>renderLibertadoresHub());
   view.querySelectorAll('[data-advance-country]').forEach(b=>b.addEventListener('click',()=>advanceCountrySeason(b.dataset.advanceCountry,b.dataset.sourceSeason)));
 }
 function buildArgentinaSchedule(competition){
