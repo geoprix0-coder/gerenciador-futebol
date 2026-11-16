@@ -51,16 +51,16 @@ const slugify=s=>s.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase()
 function initialData(){
  const old=JSON.parse(localStorage.getItem(LEGACY_STORE)||'[]');
  const clubs=[];
- const add=(name,state,id)=>{const key=slugify(name);if(!clubs.some(c=>slugify(c.name)===key))clubs.push({id:id||key,name,state:state||'',slug:key});};
- old.forEach(c=>add(c.name,c.state,c.id));
- SEED_2026.forEach(([name,state])=>add(name,state));
- [...ARGENTINA_PRIMERA_2026.A,...ARGENTINA_PRIMERA_2026.B,...ARGENTINA_NACIONAL_2026.A,...ARGENTINA_NACIONAL_2026.B].forEach(name=>add(name,''));
- const byName=name=>clubs.find(c=>slugify(c.name)===slugify(name)).id;
+ const add=(name,state,id,country='Brasil')=>{const key=slugify(name);if(!clubs.some(c=>slugify(c.name)===key&&c.country===country))clubs.push({id:id||key,name,state:state||'',slug:key,country});};
+ old.forEach(c=>add(c.name,c.state,c.id,'Brasil'));
+ SEED_2026.forEach(([name,state])=>add(name,state,undefined,'Brasil'));
+ [...ARGENTINA_PRIMERA_2026.A,...ARGENTINA_PRIMERA_2026.B,...ARGENTINA_NACIONAL_2026.A,...ARGENTINA_NACIONAL_2026.B].forEach(name=>add(name,'',undefined,'Argentina'));
+ const byName=(name,country='Brasil')=>clubs.find(c=>slugify(c.name)===slugify(name)&&c.country===country).id;
  const a=SEED_2026.filter(x=>x[2]==='A').map(x=>byName(x[0]));
  const b=SEED_2026.filter(x=>x[2]==='B').map(x=>byName(x[0]));
  const ids=names=>names.map(byName);
- const argA=ids([...ARGENTINA_PRIMERA_2026.A,...ARGENTINA_PRIMERA_2026.B]);
- const argB=ids([...ARGENTINA_NACIONAL_2026.A,...ARGENTINA_NACIONAL_2026.B]);
+ const argA=[...ARGENTINA_PRIMERA_2026.A,...ARGENTINA_PRIMERA_2026.B].map(n=>byName(n,'Argentina'));
+ const argB=[...ARGENTINA_NACIONAL_2026.A,...ARGENTINA_NACIONAL_2026.B].map(n=>byName(n,'Argentina'));
  const argentina=[{id:'arg-primera-apertura-2026',name:'Primera División · Torneo Apertura',country:'Argentina',division:'Primera División',format:'2026 · 2 zonas de 15 · 16 fechas + playoffs',argentinaType:'primera',phase:'Apertura',zones:{A:ids(ARGENTINA_PRIMERA_2026.A),B:ids(ARGENTINA_PRIMERA_2026.B)},classicPairs:ARGENTINA_CLASICOS_2026.map(p=>p.map(byName)) ,participants:argA},
  {id:'arg-primera-clausura-2026',name:'Primera División · Torneo Clausura',country:'Argentina',division:'Primera División',format:'2026 · mesmas zonas · localías invertidas + playoffs',argentinaType:'primera',phase:'Clausura',zones:{A:ids(ARGENTINA_PRIMERA_2026.A),B:ids(ARGENTINA_PRIMERA_2026.B)},classicPairs:ARGENTINA_CLASICOS_2026.map(p=>p.map(byName)),participants:argA},
  {id:'arg-nacional-2026',name:'Primera Nacional',country:'Argentina',division:'Primera Nacional',format:'2026 · 2 zonas de 18 · 36 datas · 2 acessos',argentinaType:'nacional',zones:{A:ids(ARGENTINA_NACIONAL_2026.A),B:ids(ARGENTINA_NACIONAL_2026.B)},classicPairs:ARGENTINA_NACIONAL_CLASICOS_2026.map(p=>p.map(byName)),participants:argB}];
@@ -537,6 +537,32 @@ function peruTableHtml(rows,classes={}){return '<div class="table-wrap"><table c
 ensurePeru2026();
 ensureEcuador2026();
 ensureChile2026();
+function migrateCountryScopedClubs(){
+ const byId=new Map(clubs.map(c=>[c.id,c])),usage=new Map();
+ seasons.forEach(season=>(season.competitions||[]).forEach(comp=>{
+  const country=comp.country||'Brasil';
+  const ids=new Set();
+  const visit=v=>{if(!v||typeof v!=='object')return;if(Array.isArray(v)){v.forEach(visit);return;}Object.entries(v).forEach(([k,x])=>{if(['home','away','teamA','teamB','champion','promoted','relegated','penaltyWinner'].includes(k)&&typeof x==='string'&&byId.has(x))ids.add(x);else if(['participants','A','B','title','sudamericana','descenso','ascenso'].includes(k)&&Array.isArray(x))x.forEach(id=>{if(typeof id==='string'&&byId.has(id))ids.add(id);else visit(id);});else visit(x);});};
+  visit(comp);
+  ids.forEach(id=>{if(!usage.has(id))usage.set(id,new Set());usage.get(id).add(country);});
+ }));
+ const replacements=new Map();
+ usage.forEach((countries,id)=>{
+  const club=byId.get(id);if(!club)return;
+  const list=[...countries];
+  if(list.length===1){club.country=club.country||list[0];return;}
+  list.forEach((country,index)=>{let target=club;if(index>0){target={...club,id:uid(),country};clubs.push(target);}else target.country=country;replacements.set(country+'|'+id,target.id);});
+ });
+ const replaceIn=(value,country,key='')=>{
+  if(!value||typeof value!=='object')return;
+  if(Array.isArray(value)){value.forEach((x,i)=>{if(typeof x==='string'&&byId.has(x)){const next=replacements.get(country+'|'+x);if(next)value[i]=next;}else replaceIn(x,country,key);});return;}
+  Object.entries(value).forEach(([k,x])=>{if(typeof x==='string'&&byId.has(x)&&['home','away','teamA','teamB','champion','promoted','relegated','penaltyWinner'].includes(k)){value[k]=replacements.get(country+'|'+x)||x;}else replaceIn(x,country,k);});
+ };
+ seasons.forEach(season=>(season.competitions||[]).forEach(comp=>{const country=comp.country||'Brasil';replaceIn(comp,country);}));
+ clubs.forEach(club=>{if(!club.country)club.country='Brasil';});
+}
+migrateCountryScopedClubs();
+
 
 ensureColombia2026();
 migrateColombiaCompetitions();
