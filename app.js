@@ -79,6 +79,9 @@ if(!data||!Array.isArray(data.clubs)||!Array.isArray(data.seasons)||!data.season
 }
 const view=document.querySelector('#view'),title=document.querySelector('#page-title');
 const labels={inicio:'Painel inicial',competicoes:'Competições',clubes:'Clubes',temporadas:'Temporadas',partidas:'Partidas',classificacao:'Classificação',historico:'Histórico'};
+const CONTINENTS=['América do Norte','América do Sul','Europa','Ásia','África','Oceania'];
+const COUNTRY_CONTINENT=Object.fromEntries(['Brasil','Argentina','Uruguai','Colômbia','Chile','Paraguai','Equador','Peru','Venezuela','Bolívia','Guiana','Suriname'].map(country=>[slugify(country),'América do Sul']));
+let activeCompetitionContinent=null;
 function save(){seasons.forEach(s=>s.competitions.forEach(c=>{if(c.colombiaTournaments&&c.colombiaActivePhase)c.colombiaTournaments[c.colombiaActivePhase].rounds=c.rounds||[];if(c.ecuadorDivision&&c.ecuadorStage==='final'&&c.rounds?.length)c.ecuadorFinalRounds=JSON.parse(JSON.stringify(c.rounds));if(c.ecuadorDivision&&c.ecuadorStage==='regular'&&c.rounds?.length)c.ecuadorRegularRounds=JSON.parse(JSON.stringify(c.rounds));if(c.venezuelaDivision==='Primera División'&&c.rounds?.length){if(c.venezuelaStage==='regular')c.venezuelaRegularRounds=JSON.parse(JSON.stringify(c.rounds));if(c.venezuelaStage==='quadrangular')c.venezuelaFinalRounds=JSON.parse(JSON.stringify(c.rounds));}if(c.venezuelaDivision==='Segunda División'&&c.venezuelaStage==='regional'&&c.rounds?.length)c.venezuelaRegionalRounds=JSON.parse(JSON.stringify(c.rounds));if(c.boliviaDivision&&c.boliviaStage==='groups'&&c.rounds?.length)c.boliviaGroupRounds=JSON.parse(JSON.stringify(c.rounds));}));data={clubs,seasons};localStorage.setItem(STORE,JSON.stringify(data));}
 function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
 function getClub(id){return clubs.find(c=>c.id===id);}
@@ -735,12 +738,12 @@ function clubRating(club){initializeClubRating(club);return {overall:Number(club
 function clubLink(club,label){return '<button class="club-link" data-open-club="'+club.id+'">'+esc(label||club.name)+'</button>';}
 function latestSeason(){return [...seasons].sort((a,b)=>b.year-a.year)[0];}
 function render(page='inicio'){
- title.textContent=labels[page]||'Painel inicial';
+ title.textContent=page==='competicoes'&&activeCompetitionContinent?'Competições · '+activeCompetitionContinent:(labels[page]||'Painel inicial');
  document.querySelectorAll('.nav-item').forEach(b=>b.classList.toggle('active',b.dataset.view===page));
  if(page==='inicio')renderHome();
  else if(page==='clubes')renderClubs();
  else if(page==='temporadas')renderSeasons();
- else if(page==='competicoes')renderCompetitions();
+ else if(page==='competicoes')renderCompetitions(activeCompetitionContinent);
  else {const desc={partidas:'As partidas serão geradas pelo calendário e terão resultados simulados automaticamente.',classificacao:'A classificação será calculada automaticamente a partir dos resultados das partidas.',historico:'As temporadas concluídas e as avaliações dos clubes ficarão registradas aqui.'};view.innerHTML='<div class="panel"><h3>'+labels[page]+'</h3><p class="muted">'+desc[page]+'</p><div class="empty">Este módulo será desenvolvido em uma próxima etapa.</div></div>';}
 }
 function resetTestMatches(){
@@ -1003,9 +1006,10 @@ function repairLegacyVenezuelaAdvance(){
  });
  if(changed)save();
 }
-function renderCompetitions(){
+function renderCompetitions(continent=activeCompetitionContinent){
   repairLegacyVenezuelaAdvance();
-  const countries=[...new Set(seasons.flatMap(s=>s.competitions.map(c=>c.country||'Brasil')))].sort((a,b)=>a.localeCompare(b,'pt-BR'));
+  if(!continent){view.innerHTML='<div class="panel"><div class="panel-head"><h3>Selecione um continente</h3><span class="tag">6 CONTINENTES</span></div><p class="muted">Escolha um continente no menu lateral para visualizar os países cadastrados e acessar seus campeonatos.</p></div>';return;}
+  const countries=[...new Set(seasons.flatMap(s=>s.competitions.map(c=>c.country||'Brasil')))].filter(country=>COUNTRY_CONTINENT[slugify(country)]===continent).sort((a,b)=>a.localeCompare(b,'pt-BR'));
   function countryBody(country,season){
    if(!season)return '<div class="empty">Nenhuma competição nesta temporada.</div>';
    const list=season.competitions.filter(c=>(c.country||'Brasil')===country);
@@ -1037,7 +1041,7 @@ function renderCompetitions(){
    const pending=canAdvance?'':'<p class="muted country-advance-reason">Pendente: '+blockers.map(esc).join(' · ')+'</p>';
    return '<section class="country-group"><button class="country-toggle" type="button" aria-expanded="false" data-country-toggle><span>'+esc(country)+'</span><span class="country-toggle-icon">＋</span></button><div class="country-content" hidden><div class="country-tools">'+history+actions+'</div>'+pending+'<div class="country-competitions">'+countryBody(country,current)+'</div></div></section>';
   }).join('');
-  view.innerHTML='<div class="panel"><div class="panel-head"><h3>Competições por país</h3><span class="tag">'+countries.length+' PAÍS(ES)</span></div><p class="muted">Selecione um país para visualizar seus campeonatos e escolher a temporada.</p>'+(countrySections||'<div class="empty">Nenhuma competição cadastrada.</div>')+'</div>';
+  view.innerHTML='<div class="panel"><div class="panel-head"><h3>Países · '+esc(continent)+'</h3><span class="tag">'+countries.length+' PAÍS(ES)</span></div><p class="muted">Selecione um país para visualizar seus campeonatos e escolher a temporada.</p>'+(countrySections||'<div class="empty">Ainda não há países cadastrados neste continente.</div>')+'</div>';
   view.querySelectorAll('[data-country-toggle]').forEach(button=>button.addEventListener('click',()=>{const section=button.closest('.country-group'),body=section.querySelector('.country-content'),open=body.hidden;body.hidden=!open;button.setAttribute('aria-expanded',String(open));button.querySelector('.country-toggle-icon').textContent=open?'−':'＋';}));
   view.querySelectorAll('[data-country-season]').forEach(select=>select.addEventListener('change',()=>{
    const season=seasons.find(s=>s.id===select.value);if(!season)return;
@@ -1770,6 +1774,9 @@ function renderSeasonDetail(id){
  target.querySelectorAll('[data-remove-participant]').forEach(b=>b.addEventListener('click',()=>{const [compId,clubId]=b.dataset.removeParticipant.split('|');const comp=s.competitions.find(c=>c.id===compId);comp.participants=comp.participants.filter(x=>x!==clubId);save();renderSeasonDetail(id);}));
  target.querySelectorAll('[data-add-participant]').forEach(b=>b.addEventListener('click',()=>{const comp=s.competitions.find(c=>c.id===b.dataset.addParticipant),select=document.querySelector('#add-'+comp.id),clubId=select.value;if(!clubId)return;if(comp.participants.length>=(comp.argentinaType==='nacional'?36:comp.argentinaType==='primera'?30:20)){alert('Esta competição já atingiu o limite de participantes.');return;}if(!comp.argentinaType&&s.competitions.some(other=>other!==comp&&other.participants.includes(clubId))){alert('Este clube já está inscrito na outra divisão desta temporada.');return;}comp.participants.push(clubId);save();renderSeasonDetail(id);}));
 }
-document.querySelectorAll('.nav-item').forEach(b=>b.addEventListener('click',()=>render(b.dataset.view)));
+const competitionsNav=document.querySelector('#competitions-nav'),competitionSubmenu=document.querySelector('#competition-submenu');
+competitionsNav.addEventListener('click',()=>{const opening=competitionSubmenu.hidden;competitionSubmenu.hidden=!opening;competitionsNav.setAttribute('aria-expanded',String(opening));if(opening){activeCompetitionContinent=null;document.querySelectorAll('[data-continent]').forEach(x=>x.classList.remove('active'));render('competicoes');}});
+document.querySelectorAll('[data-continent]').forEach(button=>button.addEventListener('click',()=>{activeCompetitionContinent=button.dataset.continent;document.querySelectorAll('[data-continent]').forEach(x=>x.classList.toggle('active',x===button));render('competicoes');}));
+document.querySelectorAll('.nav-item[data-view]:not(#competitions-nav)').forEach(b=>b.addEventListener('click',()=>{competitionSubmenu.hidden=true;competitionsNav.setAttribute('aria-expanded','false');render(b.dataset.view);}));
 repairArgentinaAdvancedGroups();
 render();
