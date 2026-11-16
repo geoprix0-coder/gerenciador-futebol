@@ -212,7 +212,7 @@ function countrySeason(country){
 function countrySeasonReady(country,season){
  if(!season||season.countryAdvancements?.[country])return false;
  if(country==='Uruguai'){const clausura=season.competitions.find(c=>c.country==='Uruguai'&&c.uruguayType==='primera-clausura');if(clausura&&!clausura.uruguayChampionship)uruguayCreatePrimeraFinal(season.year);}
- const competitions=season.competitions.filter(c=>(c.country||'Brasil')===country);
+ const competitions=season.competitions.filter(c=>(c.country||'Brasil')===country&&!(country==='Uruguai'&&['intermedio-serie','competencia-serie'].includes(c.uruguayType)));
  if(!competitions.length)return false;
  return competitions.every(c=>{
   const rounds=c.rounds||[];
@@ -233,7 +233,7 @@ function countrySeasonReady(country,season){
 function advanceCountrySeason(country,sourceSeasonId){
  const source=seasons.find(s=>s.id===sourceSeasonId);
  if(!countrySeasonReady(country,source)){alert('Ainda existem jogos pendentes neste país.');return;}
- const sourceComps=source.competitions.filter(c=>(c.country||'Brasil')===country);
+ const sourceComps=source.competitions.filter(c=>(c.country||'Brasil')===country&&!(country==='Uruguai'&&['intermedio-serie','competencia-serie'].includes(c.uruguayType)));
  const divisions={A:sourceComps.find(c=>c.division==='A'),B:sourceComps.find(c=>c.division==='B')};
  const nextParticipants=new Map(sourceComps.map(c=>[c.id,[...c.participants]]));
  const nextZones=new Map();
