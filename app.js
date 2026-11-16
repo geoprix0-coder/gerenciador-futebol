@@ -582,8 +582,10 @@ function ensureBolivia2026(){
  buildSchedule(league);buildSchedule(cup);buildSchedule(simon);
  season.competitions.push(league,cup,simon);
 }
+function boliviaGroupSchedule(c){const schedules=Object.entries(c.boliviaGroups||{}).map(([key,ids])=>venezuelaRoundRobin(ids));const count=Math.max(0,...schedules.map(x=>x.length));c.rounds=Array.from({length:count},(_,i)=>({number:i+1,matches:schedules.flatMap(x=>x[i]||[])}));c.boliviaGroupRounds=JSON.parse(JSON.stringify(c.rounds));c.boliviaStage='groups';}
 function boliviaGroupTable(c,key){const rounds=c.boliviaStage==='groups'?(c.rounds||[]):(c.boliviaGroupRounds||[]);return peruTable(c,c.boliviaGroups?.[key]||[],rounds);}
-function boliviaGroupStageDone(c){const keys=Object.keys(c.boliviaGroups||{});return keys.length>0&&(c.rounds||[]).length>0&&(c.rounds||[]).every(r=>(r.matches||[]).length>0&&r.matches.every(m=>m.homeGoals!==null&&m.awayGoals!==null))&&keys.every(k=>boliviaGroupTable(c,k).every(r=>r.played===6));}
+function boliviaGroupPhaseComplete(c){const rounds=c.boliviaStage==='groups'?(c.rounds||[]):(c.boliviaGroupRounds||[]),keys=Object.keys(c.boliviaGroups||{});return keys.length>0&&rounds.length>0&&rounds.every(r=>(r.matches||[]).length>0&&r.matches.every(m=>m.homeGoals!==null&&m.awayGoals!==null))&&keys.every(k=>peruTable(c,c.boliviaGroups[k],rounds).every(r=>r.played===6));}
+function boliviaGroupStageDone(c){return c.boliviaStage==='groups'&&boliviaGroupPhaseComplete(c);}
 function boliviaCreateKnockout(c){
  if(c.boliviaStage!=='groups'||!boliviaGroupStageDone(c))return false;
  const keys=Object.keys(c.boliviaGroups||{}),tables=Object.fromEntries(keys.map(k=>[k,boliviaGroupTable(c,k)]));
@@ -1432,6 +1434,7 @@ function argentinaCompetitionDescription(c){
  return 'Primeira Nacional 2026: 2 zonas de 18, turno e returno (34 datas) mais 2 jogos interzonais (36 datas). Os campeões das zonas fazem final em jogo único pelo 1º acesso. O Reducido começa com os 2º–8º de cada zona (14 clubes) na primeira fase; na segunda fase entram os sete vencedores e o perdedor da final pelo 1º acesso. O campeão do Reducido conquista o 2º acesso. Caem os dois últimos de cada zona.';
 }
 function buildSchedule(competition){
+ if(competition.boliviaDivision==='Copa de la División Profesional'||competition.boliviaDivision==='Copa Simón Bolívar'){boliviaGroupSchedule(competition);return;}
  if(competition.argentinaType){buildArgentinaSchedule(competition);return;}if(competition.peruDivision){peruBuildSchedule(competition);return;}if(competition.venezuelaDivision==='Segunda División'){const a=venezuelaRoundRobin(competition.zones.A),b=venezuelaRoundRobin(competition.zones.B);competition.rounds=Array.from({length:Math.max(a.length,b.length)},(_,i)=>({number:i+1,matches:[...(a[i]||[]),...(b[i]||[])]}));competition.venezuelaStage='regional';return;}if(competition.venezuelaDivision==='Primera División'){competition.rounds=venezuelaRoundRobin(competition.participants).slice(0,13).map((matches,i)=>({number:i+1,matches}));competition.venezuelaStage='regular';return;}
  if(['intermedio','competencia'].includes(competition.uruguayType)&&competition.zones){const zoneRounds=ids=>{const teams=[...ids],out=[];for(let r=0;r<teams.length-1;r++){const matches=[];for(let i=0;i<teams.length/2;i++){const x=teams[i],y=teams[teams.length-1-i],home=(r+i)%2===0?x:y;matches.push({home,away:home===x?y:x,homeGoals:null,awayGoals:null});}out.push(matches);teams.splice(1,0,teams.pop());}return out;};const a=zoneRounds(competition.zones.A||[]),b=zoneRounds(competition.zones.B||[]);competition.rounds=Array.from({length:Math.max(a.length,b.length)},(_,i)=>({number:i+1,matches:[...(a[i]||[]),...(b[i]||[])]}));return;}
  const teams=[...competition.participants];if(teams.length<2)return null;
