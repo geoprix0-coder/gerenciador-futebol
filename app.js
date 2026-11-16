@@ -79,7 +79,7 @@ if(!data||!Array.isArray(data.clubs)||!Array.isArray(data.seasons)||!data.season
 }
 const view=document.querySelector('#view'),title=document.querySelector('#page-title');
 const labels={inicio:'Painel inicial',competicoes:'Competições',clubes:'Clubes',temporadas:'Temporadas',partidas:'Partidas',classificacao:'Classificação',historico:'Histórico'};
-function save(){seasons.forEach(s=>s.competitions.forEach(c=>{if(c.colombiaTournaments&&c.colombiaActivePhase)c.colombiaTournaments[c.colombiaActivePhase].rounds=c.rounds||[];if(c.ecuadorDivision&&c.ecuadorStage==='final'&&c.rounds?.length)c.ecuadorFinalRounds=JSON.parse(JSON.stringify(c.rounds));if(c.ecuadorDivision&&c.ecuadorStage==='regular'&&c.rounds?.length)c.ecuadorRegularRounds=JSON.parse(JSON.stringify(c.rounds));if(c.venezuelaDivision==='Primera División'&&c.rounds?.length){if(c.venezuelaStage==='regular')c.venezuelaRegularRounds=JSON.parse(JSON.stringify(c.rounds));if(c.venezuelaStage==='quadrangular')c.venezuelaFinalRounds=JSON.parse(JSON.stringify(c.rounds));}if(c.venezuelaDivision==='Segunda División'&&c.venezuelaStage==='regional'&&c.rounds?.length)c.venezuelaRegionalRounds=JSON.parse(JSON.stringify(c.rounds));}));data={clubs,seasons};localStorage.setItem(STORE,JSON.stringify(data));}
+function save(){seasons.forEach(s=>s.competitions.forEach(c=>{if(c.colombiaTournaments&&c.colombiaActivePhase)c.colombiaTournaments[c.colombiaActivePhase].rounds=c.rounds||[];if(c.ecuadorDivision&&c.ecuadorStage==='final'&&c.rounds?.length)c.ecuadorFinalRounds=JSON.parse(JSON.stringify(c.rounds));if(c.ecuadorDivision&&c.ecuadorStage==='regular'&&c.rounds?.length)c.ecuadorRegularRounds=JSON.parse(JSON.stringify(c.rounds));if(c.venezuelaDivision==='Primera División'&&c.rounds?.length){if(c.venezuelaStage==='regular')c.venezuelaRegularRounds=JSON.parse(JSON.stringify(c.rounds));if(c.venezuelaStage==='quadrangular')c.venezuelaFinalRounds=JSON.parse(JSON.stringify(c.rounds));}if(c.venezuelaDivision==='Segunda División'&&c.venezuelaStage==='regional'&&c.rounds?.length)c.venezuelaRegionalRounds=JSON.parse(JSON.stringify(c.rounds));if(c.boliviaDivision&&c.boliviaStage==='groups'&&c.rounds?.length)c.boliviaGroupRounds=JSON.parse(JSON.stringify(c.rounds));}));data={clubs,seasons};localStorage.setItem(STORE,JSON.stringify(data));}
 function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
 function getClub(id){return clubs.find(c=>c.id===id);}
 function randomInt(min,max){return Math.floor(Math.random()*(max-min+1))+min;}
@@ -550,6 +550,103 @@ function paraguayAnnualTable(year){const season=seasons.find(x=>x.year===year),m
 const VENEZUELA_PRIMERA_2026=['Metropolitanos','Deportivo Táchira','Deportivo La Guaira','UCV','Carabobo','Portuguesa','Academia Puerto Cabello','Estudiantes de Mérida','Caracas','Monagas','Zamora','Rayo Zuliano','Trujillanos','Anzoátegui'];
 const VENEZUELA_FUTVE2_2026={A:['Academia Puerto Cabello B','Atlético Barinas','Barquisimeto','Deportivo Lara','El Vigía','Real Frontera','Ureña','Yaracuyanos','Zamora B'],B:['Aragua','Ávila FC','Bolívar','Deportivo Miranda','Dynamo Puerto','Marítimo de La Guaira','Mineros de Guayana','Monagas B']};
 function ensureVenezuela2026(){const s=seasons.find(x=>x.year===2026);if(!s||s.competitions.some(c=>c.country==='Venezuela'))return;const add=name=>{let c=clubs.find(x=>slugify(x.name)===slugify(name)&&x.country==='Venezuela');if(!c){c={id:uid(),name,state:'',slug:slugify(name),country:'Venezuela'};initializeClubRating(c);clubs.push(c);}return c.id;};const first=VENEZUELA_PRIMERA_2026.map(add),a=VENEZUELA_FUTVE2_2026.A.map(add),b=VENEZUELA_FUTVE2_2026.B.map(add);s.competitions.push({id:'ven-primera-apertura-2026',name:'Primera División · Apertura',country:'Venezuela',division:'Primera División',venezuelaDivision:'Primera División',venezuelaPhase:'Apertura',participants:[...first],singleRound:true,format:'2026 · 14 clubes · 13 rodadas · turno único + quadrangulares finais'},{id:'ven-primera-clausura-2026',name:'Primera División · Clausura',country:'Venezuela',division:'Primera División',venezuelaDivision:'Primera División',venezuelaPhase:'Clausura',participants:[...first],singleRound:true,format:'2026 · 14 clubes · 13 rodadas · turno único + quadrangulares finais'},{id:'ven-futve2-2026',name:'Liga FUTVE 2',country:'Venezuela',division:'Segunda División',venezuelaDivision:'Segunda División',zones:{A:a,B:b},participants:[...a,...b],format:'2026 · 17 clubes · grupos Centro-Occidental (9) e Centro-Oriental (8) · fase regional e mata-mata'});}
+const BOLIVIA_PRIMERA_2026=[
+ ['Always Ready','El Alto'],['Bolívar','La Paz'],['The Strongest','La Paz'],['San Antonio Bulo Bulo','Entre Ríos'],
+ ['Blooming','Santa Cruz de la Sierra'],['Independiente Petrolero','Sucre'],['Nacional Potosí','Potosí'],['Guabirá','Montero'],
+ ['GV San José','Oruro'],['Aurora','Cochabamba'],['Real Tomayapo','Tarija'],['Oriente Petrolero','Santa Cruz de la Sierra'],
+ ['Real Oruro','Oruro'],['Universitario de Vinto','Vinto'],['ABB','El Alto'],['Real Potosí','Potosí']
+];
+const BOLIVIA_CUP_GROUPS_2026={
+ A:['San Antonio Bulo Bulo','ABB','Aurora','Real Potosí'],
+ B:['Always Ready','Real Oruro','Real Tomayapo','Nacional Potosí'],
+ C:['Guabirá','Oriente Petrolero','The Strongest','Universitario de Vinto'],
+ D:['Bolívar','GV San José','Blooming','Independiente Petrolero']
+};
+const BOLIVIA_SIMON_GROUPS_2026={
+ A:['Empresa Minera Huanuni','Libertad FC','CD Fatic','Atlético Sucre'],
+ B:['Chaco FC','Hiska Nacional','Ingenieros Oruro','26 de Febrero'],
+ C:['Atlético Independiente','10 de Noviembre Wilstermann Cooperativas','Atlético Junior','Mineros de Potosí'],
+ D:['Virginia USC','Deportivo San Martín','Tiquipaya FC','Universitario de Beni'],
+ E:['Universitario de Sucre','Tigres FC','Universitario de Tarija','San Juan FC'],
+ F:['Primero de Mayo','CD Guadalajara','Ciudad Nueva Santa Cruz Academia FC','Unión Central Tarija']
+};
+function ensureBolivia2026(){
+ const season=seasons.find(x=>x.year===2026);if(!season||season.competitions.some(c=>c.country==='Bolívia'))return;
+ const add=([name,city])=>{let club=clubs.find(x=>slugify(x.name)===slugify(name)&&x.country==='Bolívia');if(!club){club={id:uid(),name,state:city||'',slug:slugify(name),country:'Bolívia'};initializeClubRating(club);clubs.push(club);}return club.id;};
+ const first=BOLIVIA_PRIMERA_2026.map(add),byBolivianName=name=>add([name,'']);
+ const mapGroups=groups=>Object.fromEntries(Object.entries(groups).map(([key,names])=>[key,names.map(byBolivianName)]));
+ const cupGroups=mapGroups(BOLIVIA_CUP_GROUPS_2026),simonGroups=mapGroups(BOLIVIA_SIMON_GROUPS_2026);
+ const league={id:'bol-primera-2026',name:'División Profesional · Liga',country:'Bolívia',division:'Primera División',boliviaDivision:'Primera División',participants:[...first],format:'2026 · 16 clubes · 30 rodadas · turno e returno'};
+ const cup={id:'bol-copa-2026',name:'Copa de la División Profesional',country:'Bolívia',division:'Copa',boliviaDivision:'Copa de la División Profesional',participants:[...first],boliviaGroups:cupGroups,boliviaStage:'groups',format:'2026 · 16 clubes · 4 grupos de 4 · quartas, semifinais e final'};
+ const simon={id:'bol-simon-2026',name:'Copa Simón Bolívar',country:'Bolívia',division:'Segunda División',boliviaDivision:'Copa Simón Bolívar',participants:[...new Set(Object.values(simonGroups).flat())],boliviaGroups:simonGroups,boliviaStage:'groups',format:'2026 · 24 clubes na fase nacional · 6 grupos de 4 · oitavas, quartas, semifinais e final · acesso à División Profesional'};
+ buildSchedule(league);buildSchedule(cup);buildSchedule(simon);
+ season.competitions.push(league,cup,simon);
+}
+function boliviaGroupTable(c,key){const rounds=c.boliviaStage==='groups'?(c.rounds||[]):(c.boliviaGroupRounds||[]);return peruTable(c,c.boliviaGroups?.[key]||[],rounds);}
+function boliviaGroupStageDone(c){const keys=Object.keys(c.boliviaGroups||{});return keys.length>0&&(c.rounds||[]).length>0&&(c.rounds||[]).every(r=>(r.matches||[]).length>0&&r.matches.every(m=>m.homeGoals!==null&&m.awayGoals!==null))&&keys.every(k=>boliviaGroupTable(c,k).every(r=>r.played===6));}
+function boliviaCreateKnockout(c){
+ if(c.boliviaStage!=='groups'||!boliviaGroupStageDone(c))return false;
+ const keys=Object.keys(c.boliviaGroups||{}),tables=Object.fromEntries(keys.map(k=>[k,boliviaGroupTable(c,k)]));
+ let qualified=[],stage='quarterfinals';
+ if(c.boliviaDivision==='Copa de la División Profesional'){
+  if(!['A','B','C','D'].every(k=>tables[k]?.length===4))return false;
+  const pairs=[['A',0,'D',1],['C',0,'B',1],['B',0,'C',1],['D',0,'A',1]];
+  const ties=pairs.map((p,i)=>chileCreateTie(tables[p[0]][p[1]].id,tables[p[2]][p[3]].id,'Quartas de final '+(i+1)));
+  c.boliviaGroupRounds=JSON.parse(JSON.stringify(c.rounds));
+  c.boliviaKnockout={stage:'quarterfinals',rounds:[{name:'Quartas de final',ties}],champion:null,runnerUp:null,completed:false,awaitingNext:false};
+ }else{
+  const thirds=[];
+  keys.forEach(k=>{if(tables[k]?.length===4){qualified.push(tables[k][0].id,tables[k][1].id);thirds.push({...tables[k][2],group:k});}});
+  thirds.sort((a,b)=>b.points-a.points||(b.gf-b.ga)-(a.gf-a.ga)||b.gf-a.gf||a.club.name.localeCompare(b.club.name,'pt-BR'));
+  if(qualified.length!==12||thirds.length!==6)return false;
+  qualified.push(...thirds.slice(0,4).map(r=>r.id));
+  const seeds=[...qualified].sort((a,b)=>{const ra=keys.flatMap(k=>tables[k]).find(r=>r.id===a),rb=keys.flatMap(k=>tables[k]).find(r=>r.id===b);return rb.points-ra.points||(rb.gf-rb.ga)-(ra.gf-ra.ga)||rb.gf-ra.gf;});
+  const ties=Array.from({length:8},(_,i)=>chileCreateTie(seeds[i],seeds[15-i],'Oitavas de final '+(i+1)));
+  c.boliviaQualified=seeds;c.boliviaGroupRounds=JSON.parse(JSON.stringify(c.rounds));
+  c.boliviaKnockout={stage:'roundOf16',rounds:[{name:'Oitavas de final',ties}],champion:null,runnerUp:null,completed:false,awaitingNext:false};
+  stage='roundOf16';
+ }
+ c.boliviaStage='knockout';c.rounds=[];return true;
+}
+function boliviaKnockoutDone(p){const r=p?.rounds?.[p.rounds.length-1];return !!r&&r.ties.length>0&&r.ties.every(t=>!!chileTieWinner(t));}
+function boliviaSimulateKnockout(c){const p=c.boliviaKnockout;if(!p||p.completed||p.awaitingNext)return;const r=p.rounds?.[p.rounds.length-1];if(!r)return;r.ties.forEach(chileSimulateTie);p.awaitingNext=boliviaKnockoutDone(p);}
+function boliviaNextKnockout(c){
+ const p=c.boliviaKnockout;if(!p||p.completed||!boliviaKnockoutDone(p))return false;
+ const last=p.rounds[p.rounds.length-1],w=last.ties.map(chileTieWinner);if(w.some(x=>!x))return false;
+ const stage=p.stage;
+ if(stage==='roundOf16'){p.stage='quarterfinals';p.rounds.push({name:'Quartas de final',ties:Array.from({length:4},(_,i)=>chileCreateTie(w[i*2],w[i*2+1],'Quartas de final '+(i+1)))});}
+ else if(stage==='quarterfinals'){p.stage='semifinals';p.rounds.push({name:'Semifinais',ties:[chileCreateTie(w[0],w[1],'Semifinal 1'),chileCreateTie(w[2],w[3],'Semifinal 2')]});}
+ else if(stage==='semifinals'){p.stage='final';p.rounds.push({name:'Final',ties:[chileCreateTie(w[0],w[1],'Final')]});}
+ else if(stage==='final'){p.champion=w[0];const tie=last.ties[0];p.runnerUp=p.champion===tie.home?tie.away:tie.home;p.completed=true;p.stage='completed';p.awaitingNext=false;return true;}
+ else return false;
+ p.awaitingNext=false;return true;
+}
+function boliviaKnockoutHtml(p){return (p?.rounds||[]).map(r=>'<h4 class="season-heading">'+esc(r.name)+'</h4>'+r.ties.map(chileRenderTie).join('')).join('');}
+function boliviaCreateIndirectPlayoff(c,season){
+ if(!c||c.boliviaDivision!=='Primera División'||c.boliviaIndirectPlayoff)return false;
+ const rows=getStandings(c),second=season?.competitions?.find(x=>x.boliviaDivision==='Copa Simón Bolívar'),p=second?.boliviaKnockout;
+ if(rows.length!==16||rows.some(r=>r.played!==30)||!p?.completed||!p.runnerUp)return false;
+ c.boliviaIndirectPlayoff=chileCreateTie(rows[14].id,p.runnerUp,'Playoff de ascenso/descenso indirecto');
+ return true;
+}
+function boliviaSimulateIndirectPlayoff(c){if(!c?.boliviaIndirectPlayoff||chileTieWinner(c.boliviaIndirectPlayoff))return;chileSimulateTie(c.boliviaIndirectPlayoff);}
+function boliviaTableView(c){
+ if(c.boliviaDivision==='Primera División'){const rows=getStandings(c);return '<div class="argentina-rules"><p>Liga em turno e returno · 30 rodadas. O último colocado é rebaixado; o penúltimo disputa o acesso indireto.</p></div>'+peruTableHtml(rows,Object.fromEntries(rows.slice(-2).map((r,i)=>[r.id,i===0?'zone-relegation':'zone-warning'])));}
+ const tables=Object.keys(c.boliviaGroups||{}).map(k=>'<h3 class="season-heading">Grupo '+k+'</h3>'+peruTableHtml(boliviaGroupTable(c,k))).join('');
+ const knockout=c.boliviaKnockout?'<h3 class="season-heading">Fase final · Mata-mata</h3><div class="playoff-panel">'+boliviaKnockoutHtml(c.boliviaKnockout)+(c.boliviaKnockout.completed?'<p class="access-confirmation">Campeão: '+esc(getClub(c.boliviaKnockout.champion)?.name||'')+'</p>':'')+'</div>':'';
+ const rule=c.boliviaDivision==='Copa Simón Bolívar'?'Os dois primeiros de cada grupo e os quatro melhores terceiros avançam às oitavas. O campeão sobe diretamente.':'Os dois primeiros de cada grupo avançam às quartas de final.';
+ return '<div class="argentina-rules"><p>'+rule+'</p></div>'+tables+knockout;
+}
+function boliviaTiePanel(c,season){
+ if(c.boliviaDivision==='Primera División'){
+  const p=c.boliviaIndirectPlayoff,second=season.competitions.find(x=>x.boliviaDivision==='Copa Simón Bolívar');
+  if(!p&&getStandings(c).every(r=>r.played===30)&&second?.boliviaKnockout?.completed)return '<div class="playoff-panel"><h3>Ascenso/descenso indirecto</h3><p class="muted">O penúltimo colocado enfrenta o vice-campeão da Copa Simón Bolívar em ida e volta.</p><button class="btn" id="create-bolivia-indirect">Gerar confronto</button></div>';
+  if(p){const winner=chileTieWinner(p);return '<div class="playoff-panel"><h3>Ascenso/descenso indirecto</h3>'+chileRenderTie(p)+(winner?'<p class="access-confirmation">Vencedor: '+esc(getClub(winner)?.name||'')+'</p>':'<button class="btn" id="simulate-bolivia-indirect">Simular próxima partida</button>')+'</div>';}
+ }
+ if(c.boliviaStage==='groups'&&boliviaGroupStageDone(c))return '<div class="playoff-panel"><h3>Fase final · Mata-mata</h3><p class="muted">'+(c.boliviaDivision==='Copa Simón Bolívar'?'Os 16 classificados disputam oitavas, quartas, semifinais e final.':'Os oito classificados disputam quartas, semifinais e final.')+'</p><button class="btn" id="create-bolivia-knockout">Gerar confrontos</button></div>';
+ if(c.boliviaStage==='knockout'&&c.boliviaKnockout){const p=c.boliviaKnockout,last=p.rounds[p.rounds.length-1];return '<div class="playoff-panel"><h3>Fase final · '+esc(last.name)+'</h3>'+boliviaKnockoutHtml(p)+(p.completed?'<p class="access-confirmation">Campeão: '+esc(getClub(p.champion)?.name||'')+'</p>' : p.awaitingNext?'<button class="btn" id="next-bolivia-knockout">Gerar próxima fase</button>':'<button class="btn" id="simulate-bolivia-knockout">Simular jogos da fase</button>')+'</div>';}
+ return '';
+}
 function venezuelaAnnualTable(year){const s=seasons.find(x=>x.year===year),map=new Map();(s?.competitions||[]).filter(c=>c.venezuelaDivision==='Primera División').forEach(c=>{const regularRounds=c.venezuelaRegularRounds||(c.venezuelaStage==='regular'?c.rounds:[]);getStandings({...c,rounds:regularRounds||[]}).forEach(r=>{if(!map.has(r.id))map.set(r.id,{...r,points:0,played:0,wins:0,draws:0,losses:0,gf:0,ga:0});const x=map.get(r.id);['points','played','wins','draws','losses','gf','ga'].forEach(k=>x[k]+=r[k]);});});return [...map.values()].sort((a,b)=>b.points-a.points||(b.gf-b.ga)-(a.gf-a.ga)||b.gf-a.gf||a.club.name.localeCompare(b.club.name,'pt-BR'));}
 function venezuelaRoundRobin(ids){const teams=[...ids];if(teams.length%2)teams.push(null);const n=teams.length,half=n/2,first=[];for(let r=0;r<n-1;r++){const matches=[];for(let i=0;i<half;i++){const a=teams[i],b=teams[n-1-i];if(a&&b){const home=(r+i)%2===0?a:b;matches.push({home,away:home===a?b:a,homeGoals:null,awayGoals:null});}}first.push(matches);teams.splice(1,0,teams.pop());}return first.concat(first.map(ms=>ms.map(m=>({home:m.away,away:m.home,homeGoals:null,awayGoals:null}))));}
 function venezuelaCreateTie(a,b,name){return chileCreateTie(a,b,name);}
@@ -580,6 +677,7 @@ ensureEcuador2026();
 ensureChile2026();
 ensureParaguay2026();
 ensureVenezuela2026();
+ensureBolivia2026();
 function migrateCountryScopedClubs(){
  const byId=new Map(clubs.map(c=>[c.id,c])),usage=new Map();
  seasons.forEach(season=>(season.competitions||[]).forEach(comp=>{
