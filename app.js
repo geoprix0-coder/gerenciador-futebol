@@ -211,6 +211,67 @@ function colombiaRelegationDecision(year){
  if(table.length<2)return {ready:false,reason:'Ainda não há partidas suficientes para calcular os dois rebaixamentos.'};
  return {ready:true,relegated:table.slice(0,2).map(r=>r.id),rows:table.slice(0,2),years:colombiaPromediosTable(year).years};
 }
+function colombiaAggregate(tie){
+ let a=0,b=0;(tie.legs||[]).forEach(m=>{if(m.homeGoals===null||m.awayGoals===null)return;if(m.home===tie.teamA){a+=m.homeGoals;b+=m.awayGoals;}else{b+=m.homeGoals;a+=m.awayGoals;}});
+ return {a,b};
+}
+function colombiaTieWinner(tie){
+ if(!tie?.legs||tie.legs.some(m=>m.homeGoals===null||m.awayGoals===null))return null;
+ const score=colombiaAggregate(tie);return score.a>score.b?tie.teamA:score.b>score.a?tie.teamB:tie.penaltyWinner||null;
+}
+function colombiaCreateTie(home,away,name){
+ return {name,teamA:home,teamB:away,legs:[{home:away,away:home,homeGoals:null,awayGoals:null},{home,away,homeGoals:null,awayGoals:null}],penaltyWinner:null};
+}
+function colombiaCreatePlayoffs(competition){
+ const phase=competition.colombiaActivePhase||'Apertura',t=competition.colombiaTournaments?.[phase],table=getStandings(competition);
+ if(!t||table.length<8||!t.rounds?.length||!t.rounds.every(r=>r.matches.every(m=>m.homeGoals!==null&&m.awayGoals!==null)))return false;
+ const first=competition.colombiaDivision==='Primera División',knockout=first&&phase==='Apertura';
+ if(knockout)t.playoff={kind:'knockout',stage:'quarterfinals',ties:[[0,7],[1,6],[2,5],[3,4]].map(([a,b],i)=>colombiaCreateTie(table[a].id,table[b].id,'Quartas de final '+(i+1)))};
+ else{
+  const groups={A:[0,2,4,6].map(i=>table[i].id),B:[1,3,5,7].map(i=>table[i].id)};
+  const makeRounds=ids=>{const temp={participants:[...ids],singleRound:false};buildSchedule(temp);return temp.rounds||[];};
+  t.playoff={kind:'quadrangular',stage:'groups',groups,groupRounds:{A:makeRounds(groups.A),B:makeRounds(groups.B)},final:null,champion:null};
+ }
+ return true;
+}
+function colombiaPlayoffStageDone(p){
+ if(!p)return false;
+ if(p.kind==='knockout')return (p.ties||[]).length>0&&p.ties.every(t=>!!colombiaTieWinner(t));
+ if(p.stage==='groups')return ['A','B'].every(z=>(p.groupRounds[z]||[]).length>0&&p.groupRounds[z].every(r=>r.matches.every(m=>m.homeGoals!==null&&m.awayGoals!==null)));
+ if(p.stage==='final')return !!colombiaTieWinner(p.final);
+ return p.stage==='completed';
+}
+function colombiaCreateNextPlayoffStage(competition){
+ const t=competition.colombiaTournaments?.[competition.colombiaActivePhase||'Apertura'],p=t?.playoff;if(!p||!colombiaPlayoffStageDone(p))return false;
+ if(p.kind==='knockout'){
+  const winners=p.ties.map(colombiaTieWinner);
+  if(p.stage==='quarterfinals'){p.stage='semifinals';p.ties=[[winners[0],winners[3]],[winners[1],winners[2]]].map((x,i)=>colombiaCreateTie(x[0],x[1],'Semifinal '+(i+1)));return true;}
+  if(p.stage==='semifinals'){p.stage='final';p.ties=[colombiaCreateTie(winners[0],winners[1],'Final')];return true;}
+  if(p.stage==='final'){p.stage='completed';p.champion=winners[0];return true;}
+ }
+ if(p.kind==='quadrangular'&&p.stage==='groups'){
+  const leader=z=>{const ids=p.groups[z],rows=ids.map(id=>({id,points:0,gf:0,ga:0})),map=new Map(rows.map(r=>[r.id,r]));(p.groupRounds[z]||[]).forEach(r=>r.matches.forEach(m=>{if(m.homeGoals===null)return;const h=map.get(m.home),a=map.get(m.away);if(!h||!a)return;h.gf+=m.homeGoals;h.ga+=m.awayGoals;a.gf+=m.awayGoals;a.ga+=m.homeGoals;if(m.homeGoals>m.awayGoals)h.points+=3;else if(m.homeGoals<m.awayGoals)a.points+=3;else{h.points++;a.points++;}}));return rows.sort((a,b)=>b.points-a.points||(b.gf-b.ga)-(a.gf-a.ga)||b.gf-a.gf)[0]?.id;};
+  p.stage='final';p.final=colombiaCreateTie(leader('A'),leader('B'),'Final do torneio');return !!p.final.teamA&&!!p.final.teamB;
+ }
+ if(p.kind==='quadrangular'&&p.stage==='final'){p.stage='completed';p.champion=colombiaTieWinner(p.final);return true;}
+ return false;
+}
+function colombiaSimulatePlayoff(competition){
+ const t=competition.colombiaTournaments?.[competition.colombiaActivePhase||'Apertura'],p=t?.playoff;if(!p)return false;
+ if(p.kind==='knockout'){
+  p.ties.forEach(tie=>{const i=tie.legs[0].homeGoals===null?0:1,m=tie.legs[i];if(m.homeGoals!==null)return;simulateMatch(m);if(i===1){const score=colombiaAggregate(tie);if(score.a===score.b)tie.penaltyWinner=Math.random()<.5?tie.teamA:tie.teamB;}});
+  return true;
+ }
+ if(p.stage==='groups'){
+  ['A','B'].forEach(z=>{const round=(p.groupRounds[z]||[]).find(r=>r.matches.some(m=>m.homeGoals===null));if(round)round.matches.forEach(m=>{if(m.homeGoals===null)simulateMatch(m);});});
+  return true;
+ }
+ if(p.stage==='final'){
+  const tie=p.final,i=tie.legs[0].homeGoals===null?0:1,m=tie.legs[i];if(m.homeGoals===null){simulateMatch(m);if(i===1){const score=colombiaAggregate(tie);if(score.a===score.b)tie.penaltyWinner=Math.random()<.5?tie.teamA:tie.teamB;}}
+  return true;
+ }
+ return false;
+}
 function ensureArgentina2026(){
  const findOrAdd=name=>{let club=clubs.find(c=>slugify(c.name)===slugify(name));if(!club){club={id:uid(),name,state:'',slug:slugify(name)};initializeClubRating(club);clubs.push(club);}return club.id;};
  const ids=names=>names.map(findOrAdd);
@@ -963,9 +1024,23 @@ function renderCompetitionDetail(seasonId,competitionId,section='table'){
   content+=rounds.length?'<div class="round-actions"><span class="muted">Rodadas: '+rounds.length+' · Jogos concluídos: '+rounds.reduce((n,r)=>n+r.matches.filter(m=>m.homeGoals!==null).length,0)+'</span><div class="round-controls"><label for="simulate-count">Simular próximas</label><select id="simulate-count">'+[1,2,3,4,5].map(n=>'<option value="'+n+'" '+(n===5?'selected':'')+'>'+n+' rodada(s)</option>').join('')+'</select><button class="btn" id="simulate-rounds">Simular resultados</button></div></div>'+rounds.map(r=>'<div class="round-card"><div class="round-title"><strong>Rodada '+r.number+'</strong><span class="tag">'+(r.matches.every(m=>m.homeGoals!==null)?'Concluída':'Pendente')+'</span></div>'+r.matches.map(m=>'<div class="fixture"><span class="fixture-team">'+clubLink(getClub(m.home),getClub(m.home).name)+'</span><strong class="score">'+(m.homeGoals===null?'—':m.homeGoals+' × '+m.awayGoals)+'</strong><span class="fixture-team away">'+clubLink(getClub(m.away),getClub(m.away).name)+'</span></div>').join('')+'</div>').join('') :'<div class="empty">Inscreva pelo menos dois clubes para gerar as rodadas automaticamente.</div>';
   const regularDone=rounds.length>0&&rounds.every(r=>r.matches.every(m=>m.homeGoals!==null&&m.awayGoals!==null));
   if(competition.colombiaDivision&&regularDone){
-   const phase=competition.colombiaActivePhase||'Apertura',isFirst=competition.colombiaDivision==='Primera División';
-   const top= getStandings(competition).slice(0,8);
-   content+='<div class="playoff-panel"><h3>Fase final · '+esc(phase)+'</h3><p class="muted">'+(isFirst&&phase==='Apertura'?'Os oito primeiros avançam às quartas de final, disputadas em ida e volta, seguidas por semifinais e final.':'Os oito primeiros avançam a dois quadrangulares de quatro clubes, em ida e volta. Os líderes disputam a final em ida e volta.')+'</p><p class="muted">Classificados pela fase regular: '+top.map((r,i)=>(i+1)+'º '+esc(r.club.name)).join(' · ')+'</p><p class="muted">A estrutura dos confrontos e a simulação das fases eliminatórias serão liberadas na próxima etapa da implementação.</p></div>';
+   const phase=competition.colombiaActivePhase||'Apertura',isFirst=competition.colombiaDivision==='Primera División',t=competition.colombiaTournaments[phase],p=t.playoff,top=getStandings(competition).slice(0,8);
+   let panel='<div class="playoff-panel"><h3>Fase final · '+esc(phase)+'</h3><p class="muted">'+(isFirst&&phase==='Apertura'?'Quartas de final, semifinais e final em ida e volta.':'Dois quadrangulares de quatro clubes, em ida e volta, e final entre os líderes.')+'</p>';
+   if(!p)panel+='<p class="muted">Classificados: '+top.map((r,i)=>(i+1)+'º '+esc(r.club.name)).join(' · ')+'</p><button class="btn" id="create-colombia-playoffs">Gerar confrontos da fase final</button>';
+   else if(p.kind==='knockout'){
+    panel+='<p class="muted">Etapa: '+esc(p.stage==='quarterfinals'?'Quartas de final':p.stage==='semifinals'?'Semifinais':p.stage==='final'?'Final':'Concluída')+'</p>'+p.ties.map(tie=>'<div class="round-card"><div class="round-title"><strong>'+esc(tie.name)+'</strong><span class="tag">'+(colombiaTieWinner(tie)?'Concluída':'Em disputa')+'</span></div>'+tie.legs.map((m,i)=>'<div class="fixture"><span class="fixture-team">'+clubLink(getClub(m.home),getClub(m.home)?.name||'')+'</span><strong class="score">'+(m.homeGoals===null?'—':m.homeGoals+' × '+m.awayGoals)+'</strong><span class="fixture-team away">'+clubLink(getClub(m.away),getClub(m.away)?.name||'')+'</span><small>Jogo '+(i+1)+'</small></div>').join('')+'</div>').join('');
+    if(p.stage==='completed')panel+='<p class="access-confirmation">Campeão: '+esc(getClub(p.champion)?.name||'')+'</p>';
+    else if(colombiaPlayoffStageDone(p))panel+='<button class="btn" id="next-colombia-playoff">Gerar próxima fase</button>';
+    else panel+='<button class="btn" id="simulate-colombia-playoff">Simular '+(p.ties.some(t=>t.legs[0].homeGoals===null)?'jogos de ida':'jogos de volta')+'</button>';
+   }else{
+    panel+='<p class="muted">Etapa: '+(p.stage==='groups'?'Quadrangulares':p.stage==='final'?'Final':'Concluída')+'</p>';
+    if(p.stage==='groups')['A','B'].forEach(z=>{panel+='<h4>Grupo '+z+'</h4>'+p.groupRounds[z].map(r=>'<div class="round-card"><div class="round-title"><strong>Rodada '+r.number+'</strong><span class="tag">'+(r.matches.every(m=>m.homeGoals!==null)?'Concluída':'Pendente')+'</span></div>'+r.matches.map(m=>'<div class="fixture"><span class="fixture-team">'+clubLink(getClub(m.home),getClub(m.home)?.name||'')+'</span><strong class="score">'+(m.homeGoals===null?'—':m.homeGoals+' × '+m.awayGoals)+'</strong><span class="fixture-team away">'+clubLink(getClub(m.away),getClub(m.away)?.name||'')+'</span></div>').join('')+'</div>').join('');});
+    if(p.stage==='final'&&p.final)panel+='<div class="round-card"><div class="round-title"><strong>Final</strong></div>'+p.final.legs.map((m,i)=>'<div class="fixture"><span class="fixture-team">'+clubLink(getClub(m.home),getClub(m.home)?.name||'')+'</span><strong class="score">'+(m.homeGoals===null?'—':m.homeGoals+' × '+m.awayGoals)+'</strong><span class="fixture-team away">'+clubLink(getClub(m.away),getClub(m.away)?.name||'')+'</span><small>Jogo '+(i+1)+'</small></div>').join('')+'</div>';
+    if(p.stage==='completed')panel+='<p class="access-confirmation">Campeão: '+esc(getClub(p.champion)?.name||'')+'</p>';
+    else if(colombiaPlayoffStageDone(p))panel+='<button class="btn" id="next-colombia-playoff">Gerar final</button>';
+    else panel+='<button class="btn" id="simulate-colombia-playoff">Simular próxima rodada/fase</button>';
+   }
+   panel+='</div>';content+=panel;
   }
   if(competition.uruguayType==='primera-clausura'&&regularDone){
    if(!competition.uruguayChampionship)uruguayCreatePrimeraFinal(season.year);
@@ -1016,6 +1091,9 @@ function renderCompetitionDetail(seasonId,competitionId,section='table'){
  if(createPlayoffs)createPlayoffs.addEventListener('click',()=>{if(createAccessPlayoffs(competition)){save();renderCompetitionDetail(seasonId,competitionId,'games');}});
  const playoffSim=document.querySelector('#simulate-playoff-leg');
  if(playoffSim)playoffSim.addEventListener('click',()=>{simulateNextPlayoffLeg(competition);save();renderCompetitionDetail(seasonId,competitionId,'games');});
+ const createColombiaPlayoffs=document.querySelector('#create-colombia-playoffs');if(createColombiaPlayoffs)createColombiaPlayoffs.addEventListener('click',()=>{if(!colombiaCreatePlayoffs(competition)){alert('Não foi possível gerar a fase final. Confira se a fase regular está completa.');return;}save();renderCompetitionDetail(seasonId,competitionId,'games');});
+ const simulateColombiaPlayoff=document.querySelector('#simulate-colombia-playoff');if(simulateColombiaPlayoff)simulateColombiaPlayoff.addEventListener('click',()=>{colombiaSimulatePlayoff(competition);save();renderCompetitionDetail(seasonId,competitionId,'games');});
+ const nextColombiaPlayoff=document.querySelector('#next-colombia-playoff');if(nextColombiaPlayoff)nextColombiaPlayoff.addEventListener('click',()=>{if(!colombiaCreateNextPlayoffStage(competition)){alert('Não foi possível gerar a próxima fase.');return;}save();renderCompetitionDetail(seasonId,competitionId,'games');});
  const simulate=document.querySelector('#simulate-rounds');
  if(simulate)simulate.addEventListener('click',()=>{const count=Number(document.querySelector('#simulate-count').value)||5;const pending=(competition.rounds||[]).filter(r=>r.matches.some(m=>m.homeGoals===null));const selected=pending.slice(0,Math.min(5,Math.max(1,count)));if(!selected.length){alert('Todas as rodadas já foram simuladas.');return;}selected.forEach(r=>r.matches.forEach(m=>{if(m.homeGoals===null)simulateMatch(m);}));season.status='Em andamento';save();renderCompetitionDetail(seasonId,competitionId,'games');});
 }function renderSeasons(){
