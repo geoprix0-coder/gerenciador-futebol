@@ -54,3 +54,24 @@
 .btn.danger{background:#8e3444;color:#fff}
 .btn.danger:hover{background:#a83d50}
 @media(max-width:650px){.reset-panel{align-items:flex-start;flex-direction:column}}
+
+/* Classification zones and promotion playoffs */
+.standings tr.zone-access{background:rgba(48,174,111,.19);box-shadow:inset 4px 0 #36c783}
+.standings tr.zone-playoff{background:rgba(226,174,49,.17);box-shadow:inset 4px 0 #e5b43f}
+.standings tr.zone-relegation{background:rgba(220,70,82,.18);box-shadow:inset 4px 0 #e05260}
+.table-legend{display:flex;gap:9px;flex-wrap:wrap;margin:4px 0 13px}
+.legend-item{font-size:11px;padding:7px 10px;border-radius:7px;font-weight:700}
+.legend-item.access{background:rgba(48,174,111,.2);color:#65dda0}
+.legend-item.playoff{background:rgba(226,174,49,.2);color:#f0c65c}
+.legend-item.relegation{background:rgba(220,70,82,.2);color:#ff8790}
+.playoff-panel{border:1px solid var(--line);border-radius:11px;padding:16px;margin:18px 0;background:#101d2d}
+.playoff-heading{display:flex;justify-content:space-between;gap:12px;align-items:flex-start;margin-bottom:12px}
+.playoff-heading h3,.playoff-panel>h3{font:700 14px Manrope;margin:0}
+.playoff-tie{border:1px solid var(--line);border-radius:9px;overflow:hidden;margin:12px 0}
+.leg-label{grid-column:1/-1;color:var(--muted);font-size:10px;text-align:center;margin-top:-5px}
+.aggregate-line{padding:11px 14px;background:var(--panel2);font-size:12px;color:var(--muted)}
+.aggregate-line strong{color:var(--text);font:800 14px Manrope;margin-left:5px}
+.promoted-name{color:#65dda0;font-weight:700}
+.playoff-actions{display:flex;justify-content:flex-end;margin-top:14px}
+.access-confirmation{color:#65dda0;font-size:12px;font-weight:700;margin:15px 0 2px}
+@media(max-width:650px){.playoff-heading{flex-direction:column}}
