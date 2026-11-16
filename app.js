@@ -212,6 +212,8 @@ function countrySeasonReady(country,season){
   const regularDone=rounds.length>0&&rounds.every(r=>r.matches.length>0&&r.matches.every(m=>m.homeGoals!==null&&m.awayGoals!==null));
   if(!regularDone)return false;
   if(country==='Argentina'&&!c.argentinaPlayoffs?.completed)return false;
+  if(country==='Uruguai'&&c.uruguayType==='primera-clausura'&&!c.uruguayChampionship?.completed)return false;
+  if(country==='Uruguai'&&c.uruguayType==='segunda-regular'&&!c.uruguayAccess?.completed)return false;
   if(country==='Brasil'&&c.division==='B'&&c.participants.length>=6){
    const ties=c.playoffs?.ties||[];
    return ties.length>0&&ties.every(t=>!!playoffWinner(t));
@@ -256,6 +258,21 @@ function advanceCountrySeason(country,sourceSeasonId){
    nextParticipants.set(second.id,[...nacionalZones.A,...nacionalZones.B]);
   }
  }
+ if(country==='Uruguai'){
+  const first=sourceComps.find(c=>c.uruguayType==='primera-apertura'),inter=sourceComps.find(c=>c.uruguayType==='intermedio'),second=sourceComps.find(c=>c.uruguayType==='segunda-regular');
+  const decision=uruguayRelegationDecision(source.year);
+  if(!first||!inter||!second||!decision.ready){alert('Não foi possível calcular os rebaixamentos da Primera División.');return;}
+  const access=second.uruguayAccess,promoted=[...(access?.promotedDirect||[]),access?.promotedThird].filter(Boolean);
+  if(promoted.length!==3){alert('O acesso da Segunda División ainda não definiu os três promovidos.');return;}
+  const relegated=decision.relegated;
+  const oldZones={A:[...(inter.zones?.A||[])],B:[...(inter.zones?.B||[])]};
+  const replace=(ids,outgoing,incoming)=>ids.map(id=>{const i=outgoing.indexOf(id);return i>=0?incoming[i]:id;});
+  const newFirst=replace(first.participants,relegated,promoted);
+  sourceComps.filter(c=>['primera-apertura','primera-clausura'].includes(c.uruguayType)).forEach(c=>nextParticipants.set(c.id,[...newFirst]));
+  const zones={A:replace(oldZones.A,relegated,promoted),B:replace(oldZones.B,relegated,promoted)};
+  nextZones.set(inter.id,zones);nextParticipants.set(inter.id,[...zones.A,...zones.B]);
+  nextParticipants.set(second.id,replace(second.participants,promoted,relegated));
+ }
  if(country==='Brasil'&&divisions.A&&divisions.B){
   const relegated=getStandings(divisions.A).slice(-4).map(r=>r.id);
   const bStandings=getStandings(divisions.B);
@@ -297,7 +314,7 @@ function renderCompetitions(){
  view.querySelectorAll('[data-country-season]').forEach(select=>select.addEventListener('change',()=>{
   const season=seasons.find(s=>s.id===select.value);if(!season)return;
   const country=select.dataset.countrySeason,section=select.closest('.country-group');
-  const primera=list.filter(c=>c.argentinaType==='primera'),uruguayFirst=list.filter(c=>['primera-apertura','intermedio-serie','primera-clausura'].includes(c.uruguayType)),uruguaySecond=list.filter(c=>['competencia-serie','segunda-regular'].includes(c.uruguayType));
+  const primera=list.filter(c=>c.argentinaType==='primera'),uruguayFirst=list.filter(c=>['primera-apertura','intermedio','intermedio-serie','primera-clausura'].includes(c.uruguayType)),uruguaySecond=list.filter(c=>['competencia-serie','segunda-regular'].includes(c.uruguayType));
   let html='';
   if(primera.length)html+='<button class="competition-open" data-open-competition="'+season.id+'|'+primera[0].id+'"><span><strong>Primera División</strong><small>Apertura e Clausura · '+primera[0].participants.length+' participantes</small></span><span class="competition-open-action">Abrir campeonato →</span></button>';
   if(uruguayFirst.length)html+='<button class="competition-open" data-open-competition="'+season.id+'|'+uruguayFirst[0].id+'"><span><strong>Primera División · Uruguai</strong><small>Apertura, Intermedio e Clausura · 16 clubes</small></span><span class="competition-open-action">Abrir campeonato →</span></button>';
@@ -380,6 +397,86 @@ function argentinaPromediosTable(year){
  const rows=[...totals.values()].map(row=>({...row,average:row.played?row.points/row.played:null}));
  rows.sort((a,b)=>(a.average??Infinity)-(b.average??Infinity)||a.points-b.points||a.id.localeCompare(b.id));
  return {years,rows};
+}
+function uruguayFirstDivisionCompetitions(year){
+ const s=seasons.find(x=>x.year===year);return (s?.competitions||[]).filter(c=>c.country==='Uruguai'&&['primera-apertura','intermedio','primera-clausura'].includes(c.uruguayType));
+}
+function uruguayAnnualTable(year){
+ const comps=uruguayFirstDivisionCompetitions(year),base=comps.find(c=>c.uruguayType==='primera-apertura');
+ const totals=new Map((base?.participants||[]).map(id=>[id,{id,points:0,played:0,wins:0,draws:0,losses:0,gf:0,ga:0}]));
+ comps.forEach(c=>(c.rounds||[]).forEach(r=>r.matches.forEach(m=>{
+  if(m.homeGoals===null||m.awayGoals===null)return;
+  [[m.home,m.homeGoals,m.awayGoals],[m.away,m.awayGoals,m.homeGoals]].forEach(([id,gf,ga])=>{
+   const row=totals.get(id);if(!row)return;row.played++;row.gf+=gf;row.ga+=ga;
+   if(gf>ga){row.wins++;row.points+=3;}else if(gf<ga)row.losses++;else{row.draws++;row.points++;}
+  });
+ })));
+ return [...totals.values()].sort((a,b)=>b.points-a.points||(b.gf-b.ga)-(a.gf-a.ga)||b.gf-a.gf||getClub(a.id).name.localeCompare(getClub(b.id).name,'pt-BR'));
+}
+function uruguayPromediosTable(year){
+ const current=seasons.find(s=>s.year===year),base=uruguayFirstDivisionCompetitions(year).find(c=>c.uruguayType==='primera-apertura');
+ const years=seasons.filter(s=>s.year<=year&&uruguayFirstDivisionCompetitions(s.year).length).map(s=>s.year).sort((a,b)=>b-a).slice(0,2);
+ const rows=new Map((base?.participants||[]).map(id=>[id,{id,points:0,played:0}]));
+ years.forEach(y=>uruguayAnnualTable(y).forEach(r=>{const x=rows.get(r.id);if(x){x.points+=r.points;x.played+=r.played;}}));
+ const result=[...rows.values()].map(r=>({...r,average:r.played?r.points/r.played:null}));
+ result.sort((a,b)=>(a.average??Infinity)-(b.average??Infinity)||a.points-b.points||a.id.localeCompare(b.id));
+ return {years,rows:result};
+}
+function uruguayRelegationDecision(year){
+ const table=uruguayPromediosTable(year),eligible=table.rows.filter(r=>r.played>0);
+ return {ready:eligible.length>=3,years:table.years,rows:table.rows,relegated:eligible.slice(0,3).map(r=>r.id)};
+}
+function uruguayCreateSingleMatch(home,away,name){return {name,home,away,homeGoals:null,awayGoals:null,penaltyWinner:null};}
+function uruguayMatchWinner(m){
+ if(!m||m.homeGoals===null||m.awayGoals===null)return null;
+ if(m.homeGoals!==m.awayGoals)return m.homeGoals>m.awayGoals?m.home:m.away;
+ return m.penaltyWinner||null;
+}
+function uruguayCreatePrimeraFinal(year){
+ const comps=uruguayFirstDivisionCompetitions(year),ap=comps.find(c=>c.uruguayType==='primera-apertura'),cl=comps.find(c=>c.uruguayType==='primera-clausura');
+ const inter=comps.find(c=>c.uruguayType==='intermedio');
+ const done=c=>(c?.rounds||[]).length>0&&c.rounds.every(r=>r.matches.length&&r.matches.every(m=>m.homeGoals!==null&&m.awayGoals!==null));
+ if(!ap||!cl||!inter||![ap,cl,inter].every(done))return false;
+ const champ=(c)=>getStandings(c)[0]?.id,apChamp=champ(ap),clChamp=champ(cl),annual=uruguayAnnualTable(year),leader=annual[0]?.id;
+ if(!apChamp||!clChamp||!leader)return false;
+ let semifinal=null,final=null;
+ if(leader===apChamp||leader===clChamp){
+  const other=leader===apChamp?clChamp:apChamp;
+  final=uruguayCreateSingleMatch(leader,other,'Final do Campeonato Uruguaio');
+ }else{
+  semifinal=uruguayCreateSingleMatch(apChamp,clChamp,'Semifinal · campeão do Apertura × campeão do Clausura');
+  final=null;
+ }
+ cl.uruguayChampionship={year,apChamp,clChamp,annualLeader:leader,semifinal,final,completed:false,awaitingFinal:!!semifinal};
+ return true;
+}
+function uruguayAdvancePrimeraFinal(competition){
+ const p=competition.uruguayChampionship;if(!p)return;
+ if(p.semifinal&&uruguayMatchWinner(p.semifinal)&&!p.final){const winner=uruguayMatchWinner(p.semifinal);p.final=uruguayCreateSingleMatch(p.annualLeader,winner,'Final · líder anual × vencedor da semifinal');p.awaitingFinal=false;return;}
+ if(p.final&&uruguayMatchWinner(p.final)){p.champion=uruguayMatchWinner(p.final);p.completed=true;}
+}
+function uruguaySimulateMatch(m){
+ if(!m||m.homeGoals!==null)return;simulateMatch(m);
+ if(m.homeGoals===m.awayGoals)m.penaltyWinner=Math.random()<.5?m.home:m.away;
+}
+function uruguayCreateAccessPlayoffs(competition){
+ const s=getStandings(competition);if(s.length<6)return false;
+ const tie=(a,b,name)=>({name,teamA:a,teamB:b,legs:[{home:b,away:a,homeGoals:null,awayGoals:null},{home:a,away:b,homeGoals:null,awayGoals:null}],penaltyWinner:null});
+ competition.uruguayAccess={promotedDirect:[s[0].id,s[1].id],semifinals:[tie(s[2].id,s[5].id,'Semifinal 1 · 3º × 6º'),tie(s[3].id,s[4].id,'Semifinal 2 · 4º × 5º')],final:null,completed:false,promotedThird:null};
+ return true;
+}
+function uruguayAccessWinner(t){
+ if(!t||t.legs.some(m=>m.homeGoals===null||m.awayGoals===null))return null;
+ const a=t.teamA,b=t.teamB;let x=0,y=0;t.legs.forEach(m=>{if(m.home===a){x+=m.homeGoals;y+=m.awayGoals;}else{y+=m.homeGoals;x+=m.awayGoals;}});
+ return x>y?a:y>x?b:t.penaltyWinner||null;
+}
+function uruguaySimulateAccessStage(c){
+ const p=c.uruguayAccess;if(!p||p.completed)return;
+ const current=p.final?[p.final]:p.semifinals;
+ const leg=current.some(t=>t.legs[0].homeGoals===null)?0:1;
+ current.forEach(t=>{const m=t.legs[leg];if(m.homeGoals===null){simulateMatch(m);if(leg===1){let a=0,b=0;t.legs.forEach(x=>{if(x.home===t.teamA){a+=x.homeGoals;b+=x.awayGoals;}else{b+=x.homeGoals;a+=x.awayGoals;}});if(a===b)t.penaltyWinner=Math.random()<.5?t.teamA:t.teamB;}}});
+ if(!p.final&&p.semifinals.every(t=>uruguayAccessWinner(t))){const winners=p.semifinals.map(uruguayAccessWinner);p.final={name:'Final do playoff · 3º acesso',teamA:winners[0],teamB:winners[1],legs:[{home:winners[1],away:winners[0],homeGoals:null,awayGoals:null},{home:winners[0],away:winners[1],homeGoals:null,awayGoals:null}],penaltyWinner:null};}
+ if(p.final&&uruguayAccessWinner(p.final)){p.promotedThird=uruguayAccessWinner(p.final);p.completed=true;}
 }
 function argentinaAnnualTable(year){
  const season=seasons.find(s=>s.year===year);
