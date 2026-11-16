@@ -195,7 +195,7 @@ function renderSelections(tab=activeSelectionTab){
  const friendlyBack=document.querySelector('#friendly-back');if(friendlyBack)friendlyBack.addEventListener('click',()=>{activeFriendlyPage=false;renderSelections('competitions');});
  const drawButton=document.querySelector('#friendly-draw');if(drawButton)drawButton.addEventListener('click',drawInternationalFriendlyFixtures);
  const simulateButton=document.querySelector('#friendly-simulate');if(simulateButton)simulateButton.addEventListener('click',simulateInternationalFriendlyFixtures);
- view.querySelectorAll('[data-selection-tab]').forEach(b=>b.addEventListener('click',()=>{activeSelectionConfederation='Todas';renderSelections(b.dataset.selectionTab);}));
+ view.querySelectorAll('[data-selection-tab]').forEach(b=>b.addEventListener('click',()=>{activeSelectionConfederation='Todas';if(b.dataset.selectionTab!=='competitions')activeFriendlyPage=false;renderSelections(b.dataset.selectionTab);}));
  const confed=document.querySelector('#selection-confederation');if(confed)confed.addEventListener('change',()=>{activeSelectionConfederation=confed.value;renderSelections('ranking');});
  view.querySelectorAll('[data-team-confed]').forEach(b=>b.addEventListener('click',()=>{activeSelectionConfederation=b.dataset.teamConfed;renderSelections('teams');}));
  const search=document.querySelector('#selection-search');if(search)search.addEventListener('input',()=>{const q=search.value.toLocaleLowerCase('pt-BR');const list=nationalTeams.filter(t=>(activeSelectionConfederation==='Todas'||t.confederation===activeSelectionConfederation)&&(t.name.toLocaleLowerCase('pt-BR').includes(q)||t.fifaName.toLowerCase().includes(q)));document.querySelector('#selection-team-table').innerHTML=selectionTeamTable(list);});
