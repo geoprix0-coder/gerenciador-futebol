@@ -86,6 +86,7 @@ let activeCompetitionContinent=null;
 const SELECTIONS_STORE='wfs-selections-ranking-v1';
 const SELECTION_MATCHES_STORE='wfs-selections-matches-v1';
 const SELECTION_RANK_HISTORY_STORE='wfs-selections-rank-history-v1';
+const FRIENDLY_DRAW_STORE='wfs-international-friendly-draw-v1';
 const CONFEDERATION_NAMES={UEFA:'Europa · UEFA',CAF:'África · CAF',AFC:'Ásia · AFC',CONCACAF:'América do Norte, Central e Caribe · CONCACAF',CONMEBOL:'América do Sul · CONMEBOL',OFC:'Oceania · OFC'};
 const MATCH_IMPORTANCE=[
  {id:'friendly_outside',label:'Amistoso fora da Data FIFA',weight:5},
@@ -119,6 +120,8 @@ if(!Array.isArray(nationalTeams)||nationalTeams.length!==211){
 let internationalMatches=JSON.parse(localStorage.getItem(SELECTION_MATCHES_STORE)||'[]');
 let selectionRankHistory=JSON.parse(localStorage.getItem(SELECTION_RANK_HISTORY_STORE)||'[]');
 let activeSelectionTab='ranking',activeSelectionConfederation='Todas',activeSelectionProfileId=null;
+let activeFriendlyPage=false;
+let internationalFriendlyDraw=JSON.parse(localStorage.getItem(FRIENDLY_DRAW_STORE)||'null');
 function saveSelections(){localStorage.setItem(SELECTIONS_STORE,JSON.stringify(nationalTeams));localStorage.setItem(SELECTION_MATCHES_STORE,JSON.stringify(internationalMatches));localStorage.setItem(SELECTION_RANK_HISTORY_STORE,JSON.stringify(selectionRankHistory));}
 function getNationalTeam(id){return nationalTeams.find(t=>t.id===id);}
 function flagEmoji(iso){
@@ -183,16 +186,45 @@ function renderSelections(tab=activeSelectionTab){
   content+='<div class="panel"><h3>Registrar resultado internacional</h3><p class="muted">O resultado atualiza imediatamente os pontos das duas seleções pelo modelo SUM inspirado no ranking FIFA.</p><form id="international-match-form"><div class="selection-match-grid"><div class="field"><label>Seleção mandante</label><select name="home" required>'+teamOptions+'</select></div><div class="field"><label>Seleção visitante</label><select name="away" required>'+awayOptions+'</select></div><div class="field"><label>Gols · mandante</label><input name="homeGoals" type="number" min="0" max="30" value="1" required></div><div class="field"><label>Gols · visitante</label><input name="awayGoals" type="number" min="0" max="30" value="0" required></div><div class="field"><label>Importância da partida</label><select name="matchType">'+MATCH_IMPORTANCE.map(t=>'<option value="'+t.id+'">'+t.label+' · peso '+t.weight+'</option>').join('')+'</select></div><div class="field"><label>Data</label><input name="matchDate" type="date" value="'+new Date().toISOString().slice(0,10)+'" required></div><div class="field penalty-field"><label>Vencedora nos pênaltis (se houver empate)</label><select name="penaltyWinner"><option value="">Não houve disputa</option><option value="home">Seleção mandante</option><option value="away">Seleção visitante</option></select></div><div class="field knockout-protection-field"><label><input name="knockoutProtection" type="checkbox"> Fase eliminatória de torneio final (proteger contra perda de pontos)</label></div></div><button class="btn" type="submit">Registrar partida e atualizar ranking</button></form></div>';
   content+='<div class="panel"><div class="panel-head"><h3>Histórico de partidas</h3><span class="tag">'+internationalMatches.length+' REGISTRADAS</span></div>'+(internationalMatches.length?'<div class="table-wrap"><table class="standings selection-match-table"><thead><tr><th>Data</th><th>Partida</th><th>Placar</th><th>Peso</th><th>Variação</th></tr></thead><tbody>'+internationalMatches.map(m=>{const h=getNationalTeam(m.home),a=getNationalTeam(m.away);return '<tr><td>'+esc(m.date)+'</td><td class="team-name">'+flagEmoji(h?.iso)+' '+esc(h?.name||'')+' × '+flagEmoji(a?.iso)+' '+esc(a?.name||'')+'</td><td>'+m.homeGoals+'–'+m.awayGoals+(m.penaltyWinner?' (pên.)':'')+'</td><td>'+m.weight+'</td><td><span class="'+(m.homeDelta>=0?'points-up':'points-down')+'">'+(m.homeDelta>0?'+':'')+m.homeDelta+'</span> / <span class="'+(m.awayDelta>=0?'points-up':'points-down')+'">'+(m.awayDelta>0?'+':'')+m.awayDelta+'</span></td></tr>';}).join('')+'</tbody></table></div>':'<div class="empty">Nenhuma partida internacional registrada.</div>')+'</div>';
  }else{
-  content+='<div class="panel"><h3>Competições internacionais previstas</h3><p class="muted">Catálogo inicial de competições para as seleções masculinas. O peso aplicado ao ranking depende da fase e do tipo exato da partida.</p>'+INTERNATIONAL_COMPETITIONS.map(c=>'<div class="competition-row"><div><strong>'+esc(c.name)+'</strong><small>'+esc(c.detail)+'</small></div><span class="tag">'+esc(c.confederation)+'</span></div>').join('')+'</div>';
+  if(activeFriendlyPage){content+=renderInternationalFriendliesPage();}else{content+='<div class="panel"><h3>Competições internacionais previstas</h3><p class="muted">Catálogo inicial de competições para as seleções masculinas. Clique em uma competição para abrir sua página.</p>'+INTERNATIONAL_COMPETITIONS.map(c=>'<button type="button" class="competition-row selection-competition-link" data-open-friendly="'+(c.name==='Amistosos internacionais'?'true':'false')+'"><div><strong>'+esc(c.name)+'</strong><small>'+esc(c.detail)+'</small></div><span class="tag">'+esc(c.confederation)+'</span></button>').join('')+'</div>';}
   content+='<div class="panel"><h3>Pesos das partidas no ranking</h3><div class="table-wrap"><table class="standings"><thead><tr><th>Tipo de partida</th><th>Peso</th></tr></thead><tbody>'+MATCH_IMPORTANCE.map(t=>'<tr><td class="team-name">'+esc(t.label)+'</td><td>'+t.weight+'</td></tr>').join('')+'</tbody></table></div></div>';
  }
  view.innerHTML=content;
  view.addEventListener('click',e=>{const row=e.target.closest('[data-selection-profile]');if(row&&view.contains(row)){activeSelectionProfileId=row.dataset.selectionProfile;renderSelections(activeSelectionTab);}});
+ view.querySelectorAll('[data-open-friendly="true"]').forEach(b=>b.addEventListener('click',()=>{activeFriendlyPage=true;renderSelections('competitions');}));
+ const friendlyBack=document.querySelector('#friendly-back');if(friendlyBack)friendlyBack.addEventListener('click',()=>{activeFriendlyPage=false;renderSelections('competitions');});
+ const drawButton=document.querySelector('#friendly-draw');if(drawButton)drawButton.addEventListener('click',drawInternationalFriendlyFixtures);
+ const simulateButton=document.querySelector('#friendly-simulate');if(simulateButton)simulateButton.addEventListener('click',simulateInternationalFriendlyFixtures);
  view.querySelectorAll('[data-selection-tab]').forEach(b=>b.addEventListener('click',()=>{activeSelectionConfederation='Todas';renderSelections(b.dataset.selectionTab);}));
  const confed=document.querySelector('#selection-confederation');if(confed)confed.addEventListener('change',()=>{activeSelectionConfederation=confed.value;renderSelections('ranking');});
  view.querySelectorAll('[data-team-confed]').forEach(b=>b.addEventListener('click',()=>{activeSelectionConfederation=b.dataset.teamConfed;renderSelections('teams');}));
  const search=document.querySelector('#selection-search');if(search)search.addEventListener('input',()=>{const q=search.value.toLocaleLowerCase('pt-BR');const list=nationalTeams.filter(t=>(activeSelectionConfederation==='Todas'||t.confederation===activeSelectionConfederation)&&(t.name.toLocaleLowerCase('pt-BR').includes(q)||t.fifaName.toLowerCase().includes(q)));document.querySelector('#selection-team-table').innerHTML=selectionTeamTable(list);});
  const matchForm=document.querySelector('#international-match-form');if(matchForm)matchForm.addEventListener('submit',e=>{e.preventDefault();if(recordInternationalMatch(matchForm)){alert('Partida registrada. O ranking mundial e o ranking continental foram atualizados.');renderSelections('ranking');}});
+}
+function renderInternationalFriendliesPage(){
+ const draw=internationalFriendlyDraw,fixtures=draw?.fixtures||[],simulated=!!draw?.simulated;
+ const rows=fixtures.map((m,i)=>{const home=getNationalTeam(m.home),away=getNationalTeam(m.away);const score=m.homeGoals===null||m.homeGoals===undefined?'—':m.homeGoals+' × '+m.awayGoals;return '<tr><td>'+(i+1)+'</td><td class="team-name">'+flagEmoji(home?.iso)+' '+esc(home?.name||'')+'</td><td class="friendly-score">'+score+'</td><td class="team-name">'+flagEmoji(away?.iso)+' '+esc(away?.name||'')+'</td><td>'+(m.homeGoals===null||m.homeGoals===undefined?'Pendente':'Simulado')+'</td></tr>';}).join('');
+ return '<div class="friendly-page"><button class="btn btn-secondary selection-back" id="friendly-back">← Voltar para competições</button><div class="panel friendly-intro"><div><span class="eyebrow">WFS · FUTEBOL INTERNACIONAL</span><h2>Amistosos internacionais</h2><p class="muted">Sorteio aleatório de 100 partidas. Cada seleção participa de no máximo uma partida neste sorteio.</p></div><div class="friendly-weight"><strong>Peso 10</strong><span>Amistoso na Data FIFA</span></div></div><div class="panel"><div class="friendly-actions"><div><h3>Programação dos amistosos</h3><p class="muted">'+(fixtures.length?(simulated?'Os 100 jogos já foram simulados e contabilizados no ranking.':'Sorteio pronto: 100 partidas · 200 seleções · 11 seleções de folga.'):'Ainda não há jogos sorteados.')+'</p></div><div class="friendly-buttons"><button class="btn" id="friendly-draw">Sortear jogos</button>'+(fixtures.length&&!simulated?'<button class="btn friendly-simulate" id="friendly-simulate">Simular jogos</button>':'')+'</div></div>'+(fixtures.length?'<div class="table-wrap"><table class="standings friendly-fixture-table"><thead><tr><th>#</th><th>MANDANTE</th><th>PLACAR</th><th>VISITANTE</th><th>STATUS</th></tr></thead><tbody>'+rows+'</tbody></table></div>':'<div class="friendly-empty">Clique em <strong>Sortear jogos</strong> para gerar os 100 confrontos.</div>')+'</div></div>';
+}
+function drawInternationalFriendlyFixtures(){
+ const shuffled=[...nationalTeams].sort(()=>Math.random()-0.5).slice(0,200),fixtures=[];
+ for(let i=0;i<200;i+=2){const first=shuffled[i],second=shuffled[i+1],homeFirst=Math.random()<0.5;fixtures.push({id:uid(),home:(homeFirst?first:second).id,away:(homeFirst?second:first).id,homeGoals:null,awayGoals:null});}
+ internationalFriendlyDraw={id:uid(),createdAt:new Date().toISOString(),simulated:false,fixtures};
+ localStorage.setItem(FRIENDLY_DRAW_STORE,JSON.stringify(internationalFriendlyDraw));renderSelections('competitions');
+}
+function poissonGoals(lambda){const limit=Math.exp(-lambda);let product=1,count=0;do{count++;product*=Math.random();}while(product>limit&&count<9);return Math.max(0,count-1);}
+function simulateInternationalFriendlyFixtures(){
+ if(!internationalFriendlyDraw||internationalFriendlyDraw.simulated||internationalFriendlyDraw.fixtures.length!==100)return;
+ const date=new Date().toISOString().slice(0,10);
+ internationalFriendlyDraw.fixtures.forEach(fixture=>{
+  const home=getNationalTeam(fixture.home),away=getNationalTeam(fixture.away);if(!home||!away)return;
+  const difference=Math.max(-0.65,Math.min(0.65,(home.points-away.points)/900));
+  const homeGoals=poissonGoals(Math.max(0.25,1.35+difference+0.12)),awayGoals=poissonGoals(Math.max(0.2,1.15-difference));
+  const simulatedForm={home:{value:home.id},away:{value:away.id},homeGoals:{value:String(homeGoals)},awayGoals:{value:String(awayGoals)},matchType:{value:'friendly_inside'},matchDate:{value:date},penaltyWinner:{value:''},knockoutProtection:{checked:false}};
+  if(recordInternationalMatch(simulatedForm)){fixture.homeGoals=homeGoals;fixture.awayGoals=awayGoals;fixture.date=date;}
+ });
+ internationalFriendlyDraw.simulated=true;internationalFriendlyDraw.simulatedAt=new Date().toISOString();
+ localStorage.setItem(FRIENDLY_DRAW_STORE,JSON.stringify(internationalFriendlyDraw));renderSelections('competitions');
 }
 function renderSelectionProfile(id){
  const team=getNationalTeam(id);if(!team){activeSelectionProfileId=null;renderSelections(activeSelectionTab);return;}
