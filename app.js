@@ -830,7 +830,7 @@ function advanceCountrySeason(country,sourceSeasonId){
  source.countryAdvancements=source.countryAdvancements||{};
  source.countryAdvancements[country]=nextYear;
  sourceComps.forEach(comp=>{
-  const nextCompetition={...Object.fromEntries(Object.entries(comp).filter(([k])=>!['rounds','playoffs','argentinaPlayoffs','uruguayChampionship','uruguayAccess','uruguayIntermedioFinal','uruguayCompetenciaFinal','colombiaPromotion','chilePlayoffs','chileTitleTie','peruPlayoffs','peruFinalGroups','peruBonus','peruRegionalRounds','peruFinalRounds','ecuadorRegularRounds','ecuadorFinalRounds','ecuadorGroups','venezuelaStage','venezuelaRegularRounds','venezuelaFinalRounds','venezuelaRegionalRounds','venezuelaGroups','venezuelaGroupWinners','venezuelaTitleFinal','venezuelaKnockout','venezuelaQualified'].includes(k))),id:uid(),name:comp.name,country,division:comp.division||'',participants:nextParticipants.get(comp.id)||[...comp.participants],...(nextZones.has(comp.id)?{zones:nextZones.get(comp.id)}:{}),...(comp.peruDivision==='Liga 2'?{peruStage:'regional'}:{}),...(comp.ecuadorDivision?{ecuadorStage:'regular'}:{}),...(comp.colombiaTournaments?{colombiaTournaments:{Apertura:{label:'Apertura',rounds:[]},Clausura:{label:'Clausura',rounds:[]}},colombiaActivePhase:'Apertura',colombiaStageView:'first'}:{}),format:comp.format||'A definir'};
+  const nextCompetition={...Object.fromEntries(Object.entries(comp).filter(([k])=>!['rounds','playoffs','argentinaPlayoffs','uruguayChampionship','uruguayAccess','uruguayIntermedioFinal','uruguayCompetenciaFinal','colombiaPromotion','chilePlayoffs','chileTitleTie','peruPlayoffs','peruFinalGroups','peruBonus','peruRegionalRounds','peruFinalRounds','ecuadorRegularRounds','ecuadorFinalRounds','ecuadorGroups','venezuelaStage','venezuelaRegularRounds','venezuelaFinalRounds','venezuelaRegionalRounds','venezuelaGroups','venezuelaGroupWinners','venezuelaTitleFinal','venezuelaKnockout','venezuelaQualified'].includes(k))),id:uid(),name:comp.name,country,division:comp.division||'',participants:nextParticipants.get(comp.id)||[...comp.participants],...(nextZones.has(comp.id)?{zones:nextZones.get(comp.id)}:{}),...(comp.peruDivision==='Liga 2'?{peruStage:'regional'}:{}),...(comp.ecuadorDivision?{ecuadorStage:'regular'}:{}),...(comp.colombiaTournaments?{colombiaTournaments:{Apertura:{label:'Apertura',rounds:[]},Clausura:{label:'Clausura',rounds:[]}},colombiaActivePhase:'Apertura',colombiaStageView:'first'}:{}),...(country==='Venezuela'?{venezuelaSeasonInitialized:true}:{}),format:comp.format||'A definir'};
   if(country==='Venezuela')buildSchedule(nextCompetition);
   target.competitions.push(nextCompetition);
  });
@@ -843,7 +843,7 @@ function repairLegacyVenezuelaAdvance(){
   const nextYear=source.countryAdvancements?.Venezuela,target=seasons.find(x=>x.year===nextYear);
   if(!nextYear||!target)return;
   const sourceComps=source.competitions.filter(c=>c.country==='Venezuela'),targetComps=target.competitions.filter(c=>c.country==='Venezuela');
-  if(sourceComps.length!==3||targetComps.length!==3||!targetComps.every(c=>!(c.rounds||[]).length))return;
+  if(sourceComps.length!==3||targetComps.length!==3||!targetComps.every(c=>!(c.rounds||[]).length)||targetComps.some(c=>c.venezuelaSeasonInitialized||c.venezuelaStage||c.venezuelaRegularRounds||c.venezuelaFinalRounds||c.venezuelaRegionalRounds||c.venezuelaGroups||c.venezuelaTitleFinal||c.venezuelaKnockout))return;
   const ap=sourceComps.find(c=>c.venezuelaPhase==='Apertura'),cl=sourceComps.find(c=>c.venezuelaPhase==='Clausura'),second=sourceComps.find(c=>c.venezuelaDivision==='Segunda División');
   const annual=venezuelaAnnualTable(source.year),relegated=annual.slice(-1).map(r=>r.id),promoted=second?.venezuelaKnockout?.champion;
   if(!ap||!cl||!second||annual.length!==14||annual.some(r=>r.played!==26)||!ap.venezuelaTitleFinal?.completed||!cl.venezuelaTitleFinal?.completed||!promoted||relegated.length!==1)return;
@@ -856,7 +856,7 @@ function repairLegacyVenezuelaAdvance(){
   const resetFields=new Set(['rounds','playoffs','venezuelaStage','venezuelaRegularRounds','venezuelaFinalRounds','venezuelaRegionalRounds','venezuelaGroups','venezuelaGroupWinners','venezuelaTitleFinal','venezuelaKnockout','venezuelaQualified']);
   const rebuilt=sourceComps.map(comp=>{
    const previous=targetComps.find(c=>c.venezuelaDivision===comp.venezuelaDivision&&(c.venezuelaPhase||'')===(comp.venezuelaPhase||''));
-   const next={...Object.fromEntries(Object.entries(comp).filter(([k])=>!resetFields.has(k))),id:previous?.id||uid(),participants:participants.get(comp.id)||[...comp.participants],...(nextZones.has(comp.id)?{zones:nextZones.get(comp.id)}:{})};
+   const next={...Object.fromEntries(Object.entries(comp).filter(([k])=>!resetFields.has(k))),id:previous?.id||uid(),participants:participants.get(comp.id)||[...comp.participants],...(nextZones.has(comp.id)?{zones:nextZones.get(comp.id)}:{}),venezuelaSeasonInitialized:true};
    buildSchedule(next);return next;
   });
   const firstIndex=target.competitions.findIndex(c=>c.country==='Venezuela');
