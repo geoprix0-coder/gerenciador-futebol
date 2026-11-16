@@ -1370,13 +1370,21 @@ function renderPlayoffs(competition){
 }
 function venezuelaTableView(c){
  if(c.venezuelaDivision==='Primera División'){
-  if(c.venezuelaStage==='regular')return '<div class="argentina-rules"><p>Fase regular · 13 rodadas. Os oito primeiros avançam aos quadrangulares.</p></div>'+peruTableHtml(getStandings({...c,rounds:c.venezuelaRegularRounds||c.rounds||[]}));
-  if(c.venezuelaStage==='quadrangular')return '<div class="argentina-rules"><p>Quadrangulares · os líderes de cada grupo avançam à final.</p></div>'+['A','B'].map(z=>'<h3 class="season-heading">Grupo '+z+'</h3>'+peruTableHtml(venezuelaGroupTable(c,z))).join('');
-  const f=c.venezuelaTitleFinal;return '<div class="playoff-panel"><h3>Final · '+esc(c.venezuelaPhase)+'</h3>'+(f?.completed?'<p class="access-confirmation">Campeão: '+esc(getClub(f.champion)?.name||'')+'</p>':'Aguardando simulação da final.')+'</div>';
+  const regular=getStandings({...c,rounds:c.venezuelaRegularRounds||c.rounds||[]});
+  const first='<h3 class="season-heading">Tabela da primeira fase · '+esc(c.venezuelaPhase)+'</h3>'+peruTableHtml(regular);
+  const annual=venezuelaAnnualTable(seasons.find(s=>s.competitions.includes(c))?.year);
+  const annualHtml='<h3 class="season-heading">Tabela acumulada · Apertura + Clausura</h3>'+peruTableHtml(annual,Object.fromEntries((annual.length===14?annual.slice(-1):[]).map(r=>[r.id,'zone-relegation'])));
+  if(c.venezuelaStage==='regular')return '<div class="argentina-rules"><p>Fase regular · 13 rodadas. Os oito primeiros avançam aos quadrangulares.</p></div>'+first+annualHtml;
+  const quadrangular=['A','B'].map(z=>'<h3 class="season-heading">Quadrangular '+z+'</h3>'+peruTableHtml(venezuelaGroupTable(c,z))).join('');
+  if(c.venezuelaStage==='quadrangular')return first+annualHtml+'<h3 class="season-heading">Segunda fase · Quadrangulares</h3>'+quadrangular;
+  const f=c.venezuelaTitleFinal;
+  return first+annualHtml+'<h3 class="season-heading">Segunda fase · Quadrangulares</h3>'+quadrangular+'<div class="playoff-panel"><h3>Final · '+esc(c.venezuelaPhase)+'</h3>'+(f?.completed?'<p class="access-confirmation">Campeão: '+esc(getClub(f.champion)?.name||'')+'</p>':'Aguardando simulação da final.')+'</div>';
  }
  const rounds=c.venezuelaRegionalRounds||c.rounds||[];
- if(c.venezuelaStage==='regional')return '<div class="argentina-rules"><p>Fase regional · quatro primeiros de cada grupo avançam ao mata-mata.</p></div>'+['A','B'].map(z=>'<h3 class="season-heading">Grupo '+z+'</h3>'+peruTableHtml(getStandings({...c,participants:c.zones[z],rounds}))).join('');
- const p=c.venezuelaKnockout;return '<div class="playoff-panel"><h3>Mata-mata de acesso</h3>'+venezuelaKnockoutHtml(p)+(p?.completed?'<p class="access-confirmation">Promovido: '+esc(getClub(p.champion)?.name||'')+'</p>':'')+'</div>';
+ const initial=['A','B'].map(z=>'<h3 class="season-heading">Tabela da primeira fase · Grupo '+(z==='A'?'Centro-Occidental':'Centro-Oriental')+'</h3>'+peruTableHtml(getStandings({...c,participants:c.zones[z],rounds}))).join('');
+ if(c.venezuelaStage==='regional')return '<div class="argentina-rules"><p>Fase regional · quatro primeiros de cada grupo avançam ao mata-mata.</p></div>'+initial;
+ const p=c.venezuelaKnockout;
+ return initial+'<h3 class="season-heading">Segunda fase · Mata-mata de acesso</h3><div class="playoff-panel">'+venezuelaKnockoutHtml(p)+(p?.completed?'<p class="access-confirmation">Promovido: '+esc(getClub(p.champion)?.name||'')+'</p>':'')+'</div>';
 }
 function renderCompetitionDetail(seasonId,competitionId,section='table'){
   const phaseSeason=seasons.find(s=>s.id===seasonId),phaseComp=phaseSeason?.competitions.find(c=>c.id===competitionId);if(phaseComp?.colombiaTournaments){phaseComp.colombiaActivePhase=phaseComp.colombiaActivePhase||'Apertura';phaseComp.rounds=phaseComp.colombiaTournaments[phaseComp.colombiaActivePhase]?.rounds||[];}if(phaseComp?.colombiaTournaments)phaseComp.colombiaStageView=phaseComp.colombiaStageView||'first';
