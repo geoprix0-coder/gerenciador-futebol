@@ -789,6 +789,7 @@ function competitionTitleName(competition){
  return competition.name;
 }
 function competitionChampion(competition){
+ if(competition.libertadoresCompetition)return competition.libertadoresStage==='completed'?competition.libertadoresChampion||null:null;
  if(competition.argentinaType==='primera')return competition.argentinaPlayoffs?.completed?competition.argentinaPlayoffs.champion||null:null;
  if(competition.argentinaType==='nacional'){const p=competition.argentinaPlayoffs;return p?.completed?argentinaMatchWinner(p.final):null;}
  const rounds=competition.rounds||[];const complete=rounds.length>0&&rounds.every(r=>r.matches.length>0&&r.matches.every(m=>m.homeGoals!==null&&m.awayGoals!==null));
@@ -1238,8 +1239,23 @@ function repairLegacyVenezuelaAdvance(){
  });
  if(changed)save();
 }
+function repairLibertadoresEditions(){
+ let changed=false;
+ [...seasons].sort((a,b)=>a.year-b.year).forEach(source=>{
+  const nextYear=source.year+1;
+  if(nextYear<2027||!LIBERTADORES_COUNTRIES.every(country=>source.countryAdvancements?.[country]===nextYear))return;
+  let target=seasons.find(season=>season.year===nextYear);
+  if(!target){target={id:uid(),year:nextYear,status:'Preparação',createdAt:new Date().toISOString(),competitions:[]};seasons.push(target);changed=true;}
+  if(!target.competitions.some(comp=>comp.libertadoresCompetition)){
+   const created=libertadoresMaybeCreateForSeason(source,target);
+   if(created)changed=true;
+  }
+ });
+ if(changed)save();
+}
 function renderCompetitions(continent=activeCompetitionContinent){
   repairLegacyVenezuelaAdvance();
+  repairLibertadoresEditions();
   if(!continent){view.innerHTML='<div class="panel"><div class="panel-head"><h3>Selecione um continente</h3><span class="tag">6 CONTINENTES</span></div><p class="muted">Escolha um continente no menu lateral para visualizar os países cadastrados e acessar seus campeonatos.</p></div>';return;}
   const countries=[...new Set(seasons.flatMap(s=>s.competitions.map(c=>c.country||'Brasil')))].filter(country=>COUNTRY_CONTINENT[slugify(country)]===continent).sort((a,b)=>a.localeCompare(b,'pt-BR'));
   function countryBody(country,season){
@@ -1274,7 +1290,7 @@ function renderCompetitions(continent=activeCompetitionContinent){
    return '<section class="country-group"><button class="country-toggle" type="button" aria-expanded="false" data-country-toggle><span>'+esc(country)+'</span><span class="country-toggle-icon">＋</span></button><div class="country-content" hidden><div class="country-tools">'+history+actions+'</div>'+pending+'<div class="country-competitions">'+countryBody(country,current)+'</div></div></section>';
   }).join('');
   const libertadoresEntries=continent==='América do Sul'?seasons.flatMap(season=>season.competitions.filter(comp=>comp.libertadoresCompetition).map(comp=>({season,comp}))).sort((a,b)=>b.season.year-a.season.year):[];
-  const continentalHtml=continent==='América do Sul'?'<section class="country-group"><div class="country-heading"><div><h2>Competições continentais</h2><p class="muted">Torneios que reúnem clubes de diferentes países da América do Sul.</p></div></div>'+(libertadoresEntries.length?libertadoresEntries.map(({season,comp})=>'<button class="competition-open" data-open-competition="'+season.id+'|'+comp.id+'"><span><strong>CONMEBOL Libertadores · '+season.year+'</strong><small>'+comp.participants.length+' participantes · '+esc(libertadoresStageLabel(comp.libertadoresStage))+'</small></span><span class="competition-open-action">Abrir competição →</span></button>').join(''):'<div class="empty">A edição de 2027 será criada quando as dez associações da CONMEBOL concluírem o avanço de suas temporadas nacionais de 2026.</div>')+'</section>':'';
+  const continentalHtml=continent==='América do Sul'?'<section class="country-group"><div class="country-heading"><div><h2>Competições continentais</h2><p class="muted">Torneios que reúnem clubes de diferentes países da América do Sul.</p></div></div>'+(libertadoresEntries.length?libertadoresEntries.map(({season,comp})=>'<button class="competition-open" data-open-competition="'+season.id+'|'+comp.id+'"><span><strong>CONMEBOL Libertadores · '+season.year+'</strong><small>'+comp.participants.length+' participantes · '+esc(libertadoresStageLabel(comp.libertadoresStage))+'</small></span><span class="competition-open-action">Abrir competição →</span></button>').join(''):(seasons.find(season=>season.libertadoresPendingReason)?.libertadoresPendingReason?'<div class="empty">A criação da Libertadores está aguardando correções: '+esc(seasons.find(season=>season.libertadoresPendingReason).libertadoresPendingReason)+'</div>':'<div class="empty">A edição de 2027 será criada quando as dez associações da CONMEBOL concluírem o avanço de suas temporadas nacionais de 2026.</div>'))+'</section>':'';
   view.innerHTML='<div class="panel"><div class="panel-head"><h3>Países · '+esc(continent)+'</h3><span class="tag">'+countries.length+' PAÍS(ES)</span></div><p class="muted">Selecione um país para visualizar seus campeonatos e escolher a temporada.</p>'+continentalHtml+(countrySections||'<div class="empty">Ainda não há países cadastrados neste continente.</div>')+'</div>';
   view.querySelectorAll('[data-country-toggle]').forEach(button=>button.addEventListener('click',()=>{const section=button.closest('.country-group'),body=section.querySelector('.country-content'),open=body.hidden;body.hidden=!open;button.setAttribute('aria-expanded',String(open));button.querySelector('.country-toggle-icon').textContent=open?'−':'＋';}));
   view.querySelectorAll('[data-country-season]').forEach(select=>select.addEventListener('change',()=>{
