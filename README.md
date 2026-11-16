@@ -41,3 +41,18 @@ Abra `index.html` em um navegador. Para publicar, o repositório poderá ser con
 4. Geração de calendário e classificação.
 5. Motor de simulação e evolução interna dos ratings.
 6. Histórico e estatísticas.
+
+ 
+## Seleções nacionais · WFS
+
+O módulo de seleções masculinas inclui as 211 associações filiadas à FIFA, agrupadas nas seis confederações (UEFA, CAF, AFC, CONCACAF, CONMEBOL e OFC). Todas começam com 1.000 pontos, sem vantagem inicial.
+
+O ranking usa uma implementação do modelo SUM inspirada na metodologia FIFA:
+- expectativa calculada pela diferença de pontos das seleções;
+- atualização após cada resultado internacional;
+- importância da partida configurada por tipo/fase (pesos de 5 a 60);
+- tratamento separado de empates decididos por pênaltis;
+- rankings mundial e filtrados por confederação;
+- histórico de partidas e variações de pontos.
+
+As partidas são registradas na área Seleções. O catálogo de competições internacionais está incluído como estrutura inicial; calendários e regulamentos completos de cada torneio são etapas posteriores.
