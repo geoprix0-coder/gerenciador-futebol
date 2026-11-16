@@ -678,7 +678,7 @@ function countrySeasonBlockers(country,season){
   if(country==='Colômbia'&&c.colombiaDivision==='Segunda División'&&!colombiaPromotionStatus(c).complete)blockers.push('Segunda División: os dois acessos à Primera División ainda não foram definidos.');
   if(country==='Colômbia'&&c.colombiaTournaments)Object.entries(c.colombiaTournaments).forEach(([phase,t])=>{if(!t.playoff||t.playoff.stage!=='completed')blockers.push(c.name+' · '+phase+': fase final ainda não foi concluída.');});
   if(country==='Venezuela'&&c.venezuelaDivision==='Primera División'&&c.venezuelaPhase==='Clausura'&&venezuelaAnnualTable(season.year).some(r=>r.played<26))blockers.push('Primera División: Apertura e Clausura precisam completar as 26 partidas por clube.');
-  if(country==='Venezuela'&&c.venezuelaDivision==='Segunda División'&&getStandings(c).some(r=>r.played<(c.zones?.A?.length===9?16:14)))blockers.push('Liga FUTVE 2: fase regional ainda tem partidas pendentes.');
+  if(country==='Venezuela'&&c.venezuelaDivision==='Segunda División'&&['A','B'].some(z=>getStandings({...c,participants:c.zones[z]}).some(r=>r.played!==(c.zones[z].length===9?16:14))))blockers.push('Liga FUTVE 2: fase regional ainda tem partidas pendentes.');
   if(country==='Paraguai'&&c.paraguayDivision==='Primera División'&&c.paraguayPhase==='Clausura'&&paraguayAnnualTable(season.year).some(r=>r.played<44))blockers.push('Primera División: Apertura e Clausura precisam completar as 44 partidas por clube para definir os rebaixados.');
    if(country==='Paraguai'&&c.paraguayDivision==='División Intermedia'&&getStandings(c).some(r=>r.played<30))blockers.push('División Intermedia: as 30 rodadas precisam ser concluídas para definir os dois acessos.');
    if(country==='Chile'&&c.chileDivision){
