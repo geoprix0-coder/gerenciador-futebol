@@ -837,6 +837,237 @@ function countrySeasonBlockers(country,season){
  return [...new Set(blockers)];
 }
 function countrySeasonReady(country,season){return countrySeasonBlockers(country,season).length===0;}
+
+const LIBERTADORES_COUNTRIES=['Argentina','Brasil','Bolívia','Chile','Colômbia','Equador','Paraguai','Peru','Uruguai','Venezuela'];
+function libertadoresDomesticRows(season,country){
+ const comps=season.competitions.filter(c=>c.country===country);
+ const first=comps.find(c=>country==='Brasil'?c.division==='A':country==='Argentina'?c.argentinaType==='primera':country==='Bolívia'?c.boliviaDivision==='Primera División':country==='Chile'?c.chileDivision==='Primera División':country==='Colômbia'?c.colombiaDivision==='Primera División':country==='Equador'?c.ecuadorDivision==='Serie A':country==='Paraguai'?c.paraguayDivision==='Primera División':country==='Peru'?c.peruDivision==='Primera División':country==='Uruguai'?c.uruguayType==='primera-apertura':country==='Venezuela'?c.venezuelaDivision==='Primera División':false);
+ if(!first)return [];
+ let rows=[];
+ if(country==='Argentina')rows=argentinaAnnualTable(season.year);
+ else if(country==='Uruguai')rows=uruguayAnnualTable(season.year);
+ else if(country==='Colômbia')rows=colombiaAnnualTable(season.year,'Primera División');
+ else if(country==='Paraguai')rows=paraguayAnnualTable(season.year);
+ else if(country==='Peru')rows=peruAnnualTable(season.year);
+ else if(country==='Venezuela')rows=venezuelaAnnualTable(season.year);
+ else if(country==='Equador'){
+  const regular=first.ecuadorRegularRounds||(first.ecuadorStage==='regular'?first.rounds:[]);
+  const finals=first.ecuadorFinalRounds||(first.ecuadorStage==='final'?first.rounds:[]);
+  const base=getStandings({...first,rounds:regular||[]}),final=getStandings({...first,rounds:finals||[]}),map=new Map(base.map(x=>[x.id,{...x}]));
+  final.forEach(x=>{const row=map.get(x.id);if(!row)return;['points','played','wins','draws','losses','gf','ga'].forEach(k=>row[k]=(row[k]||0)+(x[k]||0));});
+  rows=[...map.values()];
+ }else rows=getStandings(first);
+ if(!rows.length)rows=getStandings(first);
+ return rows.map(row=>({...row,club:getClub(row.id),country})).filter(row=>row.club).sort((a,b)=>(b.points||0)-(a.points||0)||((b.gf||0)-(b.ga||0))-((a.gf||0)-(a.ga||0))||(b.gf||0)-(a.gf||0)||a.club.name.localeCompare(b.club.name,'pt-BR'));
+}
+function libertadoresBuildQualification(source){
+ const tables=Object.fromEntries(LIBERTADORES_COUNTRIES.map(country=>[country,libertadoresDomesticRows(source,country)]));
+ const needed={Argentina:7,Brasil:8,'Bolívia':4,Chile:4,'Colômbia':4,'Equador':4,'Paraguai':4,Peru:4,Uruguai:4,Venezuela:4};
+ const missing=Object.entries(needed).filter(([country,count])=>(tables[country]||[]).length<count);
+ if(missing.length)return {ok:false,reason:'Classificação continental incompleta: '+missing.map(([country,count])=>country+' precisa de '+count+' posições válidas').join('; ')+'.'};
+ const result={group:[],phase1:[],phase2:[],extras:[]},used=new Set();
+ const add=(country,position,target,label)=>{
+  const table=tables[country]||[];
+  let row=table[position-1];
+  if(!row||used.has(row.id))row=table.slice(Math.max(0,position)).find(x=>!used.has(x.id));
+  if(!row)return false;
+  used.add(row.id);target.push({id:row.id,country,position:table.findIndex(x=>x.id===row.id)+1,label});
+  return true;
+ };
+ const many=(country,positions,target,label)=>positions.every(position=>add(country,position,target,label));
+ if(!many('Argentina',[1,2,3,4,5],result.group,'Vaga direta · Argentina')||
+    !many('Brasil',[1,2,3,4,5],result.group,'Vaga direta · Brasil')||
+    !many('Chile',[1,2],result.group,'Vaga direta · Chile')||
+    !many('Colômbia',[1,2],result.group,'Vaga direta · Colômbia')||
+    !many('Bolívia',[1,2],result.group,'Vaga direta · Bolívia')||
+    !many('Equador',[1,2],result.group,'Vaga direta · Equador')||
+    !many('Paraguai',[1,2],result.group,'Vaga direta · Paraguai')||
+    !many('Peru',[1,2],result.group,'Vaga direta · Peru')||
+    !many('Uruguai',[1,2],result.group,'Vaga direta · Uruguai')||
+    !many('Venezuela',[1,2],result.group,'Vaga direta · Venezuela')||
+    !many('Brasil',[6,7],result.phase2,'Fase 2 · Brasil')||
+    !many('Colômbia',[3,4],result.phase2,'Fase 2 · Colômbia')||
+    !many('Chile',[3,4],result.phase2,'Fase 2 · Chile')||
+    !many('Argentina',[6],result.phase2,'Fase 2 · Argentina')||
+    !many('Bolívia',[3],result.phase2,'Fase 2 · Bolívia')||
+    !many('Equador',[3],result.phase2,'Fase 2 · Equador')||
+    !many('Paraguai',[3],result.phase2,'Fase 2 · Paraguai')||
+    !many('Peru',[3],result.phase2,'Fase 2 · Peru')||
+    !many('Uruguai',[3],result.phase2,'Fase 2 · Uruguai')||
+    !many('Venezuela',[3],result.phase2,'Fase 2 · Venezuela')||
+    !many('Bolívia',[4],result.phase1,'Fase 1 · Bolívia')||
+    !many('Equador',[4],result.phase1,'Fase 1 · Equador')||
+    !many('Paraguai',[4],result.phase1,'Fase 1 · Paraguai')||
+    !many('Peru',[4],result.phase1,'Fase 1 · Peru')||
+    !many('Uruguai',[4],result.phase1,'Fase 1 · Uruguai')||
+    !many('Venezuela',[4],result.phase1,'Fase 1 · Venezuela'))return {ok:false,reason:'Não foi possível distribuir as vagas nacionais sem duplicar clubes.'};
+ const previous=source.competitions.find(c=>c.libertadoresCompetition&&c.libertadoresStage==='completed')?.libertadoresChampion;
+ if(previous&&!used.has(previous)){
+  const club=getClub(previous);if(club){used.add(previous);result.extras.push({id:previous,country:club.country||'América do Sul',position:null,label:'Campeão vigente da CONMEBOL Libertadores'});}
+ }
+ const wildcardCandidates=[...(tables.Brasil||[]).slice(7).map(row=>({row,country:'Brasil'})),...(tables.Argentina||[]).slice(6).map(row=>({row,country:'Argentina'})),...LIBERTADORES_COUNTRIES.flatMap(country=>(tables[country]||[]).slice(4).map(row=>({row,country})))];
+ wildcardCandidates.sort((a,b)=>clubRating(b.row.club).overall-clubRating(a.row.club).overall||a.row.club.name.localeCompare(b.row.club.name,'pt-BR'));
+ for(const candidate of wildcardCandidates){if(result.extras.length>=2)break;if(used.has(candidate.row.id))continue;used.add(candidate.row.id);result.extras.push({id:candidate.row.id,country:candidate.country,position:(tables[candidate.country]||[]).findIndex(x=>x.id===candidate.row.id)+1,label:'Vaga extra da edição inaugural'});}
+ if(result.extras.length!==2)return {ok:false,reason:'Não foi possível preencher as duas vagas extras necessárias para completar os 47 participantes.'};
+ result.group.push(...result.extras);
+ const all=[...result.group,...result.phase1,...result.phase2];
+ if(all.length!==47||new Set(all.map(x=>x.id)).size!==47)return {ok:false,reason:'A distribuição final não atingiu 47 clubes únicos.'};
+ return {ok:true,qualifiers:result,participants:all.map(x=>x.id),tables};
+}
+function libertadoresCreateTie(home,away,name,single=false){
+ return {name,home,away,legs:single?[{home,away,homeGoals:null,awayGoals:null,neutral:true}]:[{home:away,away:home,homeGoals:null,awayGoals:null},{home,away,homeGoals:null,awayGoals:null}],penaltyWinner:null};
+}
+function libertadoresTieScore(tie){
+ let home=0,away=0;(tie.legs||[]).forEach(match=>{if(match.homeGoals===null||match.awayGoals===null)return;if(match.home===tie.home){home+=match.homeGoals;away+=match.awayGoals;}else{away+=match.homeGoals;home+=match.awayGoals;}});
+ return {home,away};
+}
+function libertadoresTieWinner(tie){
+ if(!tie?.legs?.length||tie.legs.some(match=>match.homeGoals===null||match.awayGoals===null))return null;
+ const score=libertadoresTieScore(tie);return score.home>score.away?tie.home:score.away>score.home?tie.away:tie.penaltyWinner||null;
+}
+function libertadoresSimulateTie(tie){
+ const index=(tie.legs||[]).findIndex(match=>match.homeGoals===null||match.awayGoals===null);if(index<0)return;
+ simulateMatch(tie.legs[index]);
+ if(index===tie.legs.length-1){const score=libertadoresTieScore(tie);if(score.home===score.away)tie.penaltyWinner=Math.random()<.5?tie.home:tie.away;}
+}
+function libertadoresDrawPairs(ids,label){
+ const pool=[...ids].sort((a,b)=>clubRating(getClub(b)).overall-clubRating(getClub(a)).overall);
+ const ties=[];
+ while(pool.length>=2){
+  const first=pool.shift(),country=getClub(first)?.country;
+  let index=-1;for(let i=pool.length-1;i>=0;i--)if(getClub(pool[i])?.country!==country){index=i;break;}
+  if(index<0)index=pool.length-1;
+  const second=pool.splice(index,1)[0];ties.push(libertadoresCreateTie(first,second,label+' '+(ties.length+1)));
+ }
+ return ties;
+}
+function libertadoresBuildGroupSchedule(c){
+ const groups=c.libertadoresGroups||{},schedules=Object.values(groups).map(ids=>peruRoundRobin(ids));
+ c.rounds=Array.from({length:6},(_,i)=>({number:i+1,matches:schedules.flatMap(rounds=>rounds[i]||[])}));
+ c.libertadoresGroupRounds=JSON.parse(JSON.stringify(c.rounds));
+}
+function libertadoresDrawGroups(ids){
+ const keys=['A','B','C','D','E','F','G','H'],groups=Object.fromEntries(keys.map(key=>[key,[]])),byCountry=new Map();
+ ids.forEach(id=>{const country=getClub(id)?.country||'Outros';if(!byCountry.has(country))byCountry.set(country,[]);byCountry.get(country).push(id);});
+ const countries=[...byCountry.entries()].sort((a,b)=>b[1].length-a[1].length||a[0].localeCompare(b[0],'pt-BR'));
+ countries.forEach(([country,teams])=>{
+  teams.sort((a,b)=>clubRating(getClub(b)).overall-clubRating(getClub(a)).overall);
+  teams.forEach(id=>{
+   const available=keys.filter(key=>groups[key].length<4&&!groups[key].some(other=>(getClub(other)?.country||'Outros')===country)).sort((a,b)=>groups[a].length-groups[b].length);
+   const key=available[0]||keys.filter(x=>groups[x].length<4).sort((a,b)=>groups[a].length-groups[b].length)[0];
+   if(key)groups[key].push(id);
+  });
+ });
+ return groups;
+}
+function libertadoresGroupTable(c,key){return peruTable(c,c.libertadoresGroups?.[key]||[],c.libertadoresGroupRounds||c.rounds||[]);}
+function libertadoresGroupsComplete(c){
+ const rounds=c.libertadoresGroupRounds||c.rounds||[];
+ return rounds.length===6&&rounds.every(round=>round.matches.length>0&&round.matches.every(match=>match.homeGoals!==null&&match.awayGoals!==null));
+}
+function libertadoresStageLabel(stage){
+ return ({preliminary1:'Fase preliminar · Fase 1',preliminary2:'Fase preliminar · Fase 2',preliminary3:'Fase preliminar · Fase 3',groups:'Fase de grupos',round16:'Oitavas de final',quarterfinals:'Quartas de final',semifinals:'Semifinais',final:'Final',completed:'Competição concluída'})[stage]||'CONMEBOL Libertadores';
+}
+function libertadoresSimulateStage(c){
+ if(!c.libertadoresTies?.length||c.libertadoresAwaitingNext)return;
+ c.libertadoresTies.forEach(libertadoresSimulateTie);
+ if(c.libertadoresTies.every(tie=>!!libertadoresTieWinner(tie))){
+  if(c.libertadoresStage==='final'){c.libertadoresChampion=libertadoresTieWinner(c.libertadoresTies[0]);c.libertadoresStage='completed';c.libertadoresAwaitingNext=false;}
+  else c.libertadoresAwaitingNext=true;
+ }
+}
+function libertadoresNextStage(c){
+ if(!c.libertadoresAwaitingNext||!c.libertadoresTies?.length)return false;
+ const winners=c.libertadoresTies.map(libertadoresTieWinner);if(winners.some(id=>!id))return false;
+ if(c.libertadoresStage==='preliminary1'){
+  const entrants=[...(c.libertadoresQualifiers.phase2||[]).map(x=>x.id),...winners];
+  if(entrants.length!==16)return false;
+  c.libertadoresTies=libertadoresDrawPairs(entrants,'Fase 2');c.libertadoresStage='preliminary2';
+ }else if(c.libertadoresStage==='preliminary2'){
+  if(winners.length!==8)return false;
+  const seeded=[...winners].sort((a,b)=>clubRating(getClub(b)).overall-clubRating(getClub(a)).overall);
+  c.libertadoresTies=[libertadoresCreateTie(seeded[0],seeded[7],'Fase 3 · Confronto 1'),libertadoresCreateTie(seeded[1],seeded[6],'Fase 3 · Confronto 2'),libertadoresCreateTie(seeded[2],seeded[5],'Fase 3 · Confronto 3'),libertadoresCreateTie(seeded[3],seeded[4],'Fase 3 · Confronto 4')];
+  c.libertadoresStage='preliminary3';
+ }else if(c.libertadoresStage==='preliminary3'){
+  const groupTeams=[...(c.libertadoresQualifiers.group||[]).map(x=>x.id),...winners];
+  if(groupTeams.length!==32)return false;
+  c.libertadoresGroups=libertadoresDrawGroups(groupTeams);
+  if(Object.values(c.libertadoresGroups).some(group=>group.length!==4))return false;
+  c.libertadoresStage='groups';c.libertadoresTies=[];c.libertadoresAwaitingNext=false;
+  libertadoresBuildGroupSchedule(c);
+ }else if(c.libertadoresStage==='round16'){
+  if(winners.length!==8)return false;c.libertadoresTies=libertadoresDrawPairs(winners,'Quartas de final');c.libertadoresStage='quarterfinals';
+ }else if(c.libertadoresStage==='quarterfinals'){
+  if(winners.length!==4)return false;c.libertadoresTies=libertadoresDrawPairs(winners,'Semifinal');c.libertadoresStage='semifinals';
+ }else if(c.libertadoresStage==='semifinals'){
+  if(winners.length!==2)return false;c.libertadoresTies=[libertadoresCreateTie(winners[0],winners[1],'Final da CONMEBOL Libertadores',true)];c.libertadoresStage='final';
+ }else return false;
+ c.libertadoresAwaitingNext=false;return true;
+}
+function libertadoresCreateRoundOf16(c){
+ if(c.libertadoresStage!=='groups'||!libertadoresGroupsComplete(c))return false;
+ const keys=['A','B','C','D','E','F','G','H'],winners=keys.map(key=>({group:key,row:libertadoresGroupTable(c,key)[0]})),runners=keys.map(key=>({group:key,row:libertadoresGroupTable(c,key)[1]}));
+ if([...winners,...runners].some(x=>!x.row))return false;
+ const used=new Set(),ties=[];
+ winners.sort((a,b)=>b.row.points-a.row.points||(b.row.gf-b.row.ga)-(a.row.gf-a.row.ga));
+ winners.forEach((winner,index)=>{
+  const candidates=runners.filter(r=>!used.has(r.row.id)&&r.group!==winner.group);
+  candidates.sort((a,b)=>{
+   const aSame=(getClub(a.row.id)?.country===getClub(winner.row.id)?.country)?1:0,bSame=(getClub(b.row.id)?.country===getClub(winner.row.id)?.country)?1:0;
+   return aSame-bSame||a.row.points-b.row.points;
+  });
+  const runner=candidates[0];if(!runner)return;
+  used.add(runner.row.id);ties.push(libertadoresCreateTie(winner.row.id,runner.row.id,'Oitavas · '+winner.group+'1 × '+runner.group+'2'));
+ });
+ if(ties.length!==8)return false;
+ c.libertadoresStage='round16';c.libertadoresTies=ties;c.libertadoresAwaitingNext=false;c.rounds=[];delete c.libertadoresGroupRounds;return true;
+}
+function libertadoresRosterHtml(title,entries){
+ return '<h3 class="season-heading">'+esc(title)+' · '+entries.length+' clubes</h3><div class="club-list">'+entries.map(entry=>{const club=getClub(entry.id);return '<div class="club"><span>'+clubLink(club,club?.name||'Clube')+'</span><small>'+esc(entry.country||club?.country||'')+(entry.position?' · '+entry.position+'º':'')+'</small></div>';}).join('')+'</div>';
+}
+function libertadoresTableView(c){
+ const q=c.libertadoresQualifiers||{};
+ if(c.libertadoresStage==='groups'||c.libertadoresStage==='round16'||c.libertadoresStage==='quarterfinals'||c.libertadoresStage==='semifinals'||c.libertadoresStage==='final'||c.libertadoresStage==='completed'){
+  let html='<div class="argentina-rules"><p>CONMEBOL Libertadores '+c.libertadoresYear+': 32 clubes na fase de grupos, oito grupos de quatro. Os dois primeiros de cada grupo avançam às oitavas de final; os terceiros colocados encerram sua participação nesta competição.</p></div>';
+  if(c.libertadoresGroups)html+=['A','B','C','D','E','F','G','H'].map(key=>'<h3 class="season-heading">Grupo '+key+'</h3>'+peruTableHtml(libertadoresGroupTable(c,key))).join('');
+  if(c.libertadoresTies?.length)html+=libertadoresStagePanel(c);
+  if(c.libertadoresStage==='completed')html+='<p class="access-confirmation">Campeão da CONMEBOL Libertadores '+c.libertadoresYear+': '+esc(getClub(c.libertadoresChampion)?.name||'')+'</p>';
+  return html;
+ }
+ return '<div class="argentina-rules"><p>Classificação para a edição '+c.libertadoresYear+'. A fase de grupos começa com 28 classificados diretos; quatro vagas serão preenchidas pelos vencedores das três fases preliminares.</p></div>'+
+  libertadoresRosterHtml('Classificados diretamente à fase de grupos',q.group||[])+
+  libertadoresRosterHtml('Fase 1 · seis clubes',q.phase1||[])+
+  libertadoresRosterHtml('Fase 2 · treze classificados diretos',q.phase2||[]);
+}
+function libertadoresTieHtml(tie){
+ const winner=libertadoresTieWinner(tie),score=libertadoresTieScore(tie);
+ return '<div class="playoff-tie"><div class="round-title"><strong>'+esc(tie.name)+'</strong><span class="tag">'+(winner?'Concluído':'Em disputa')+'</span></div>'+
+  tie.legs.map((match,index)=>'<div class="fixture"><span class="fixture-team">'+clubLink(getClub(match.home),getClub(match.home)?.name||'')+'</span><strong class="score">'+(match.homeGoals===null?'—':match.homeGoals+' × '+match.awayGoals)+'</strong><span class="fixture-team away">'+clubLink(getClub(match.away),getClub(match.away)?.name||'')+'</span></div>').join('')+
+  '<div class="aggregate-line">Agregado <strong>'+score.home+' × '+score.away+'</strong>'+(tie.penaltyWinner?' · Pênaltis: '+esc(getClub(tie.penaltyWinner)?.name||''):'')+'</div>'+
+  (winner?'<p class="promoted-name">Classificado: '+esc(getClub(winner)?.name||'')+'</p>':'')+'</div>';
+}
+function libertadoresStagePanel(c){
+ if(c.libertadoresStage==='completed')return '<div class="playoff-panel"><h3>Campeão da CONMEBOL Libertadores '+c.libertadoresYear+'</h3><p class="access-confirmation">'+esc(getClub(c.libertadoresChampion)?.name||'')+'</p></div>';
+ if(c.libertadoresStage==='groups')return '<div class="playoff-panel"><h3>Fase de grupos</h3><p class="muted">'+(libertadoresGroupsComplete(c)?'Os oito grupos foram concluídos. Gere as oitavas de final.':'Conclua as seis rodadas para liberar as oitavas de final.')+'</p>'+(libertadoresGroupsComplete(c)?'<button class="btn" id="create-libertadores-round16">Gerar oitavas de final</button>':'')+'</div>';
+ const ties=c.libertadoresTies||[],stage=libertadoresStageLabel(c.libertadoresStage);
+ return '<div class="playoff-panel"><div class="playoff-heading"><div><h3>'+esc(stage)+'</h3><p class="muted">Confrontos eliminatórios em ida e volta, exceto a final, disputada em jogo único.</p></div><span class="tag">'+(c.libertadoresAwaitingNext?'FASE CONCLUÍDA':'ELIMINATÓRIA')+'</span></div>'+
+  ties.map(libertadoresTieHtml).join('')+
+  (c.libertadoresAwaitingNext?'<button class="btn" id="next-libertadores-stage">Gerar próxima fase</button>':'<button class="btn" id="simulate-libertadores-stage">Simular '+(ties.some(tie=>tie.legs.some(match=>match.homeGoals===null))?'jogos da fase':'jogos')+'</button>')+'</div>';
+}
+function libertadoresGamesPanel(c,regularDone){
+ if(c.libertadoresStage==='groups')return libertadoresStagePanel(c);
+ return libertadoresStagePanel(c);
+}
+function libertadoresMaybeCreateForSeason(source,target){
+ if(!source||!target||target.year<2027||target.competitions.some(c=>c.libertadoresCompetition))return false;
+ if(!LIBERTADORES_COUNTRIES.every(country=>source.countryAdvancements?.[country]===target.year))return false;
+ const built=libertadoresBuildQualification(source);
+ if(!built.ok){target.libertadoresPendingReason=built.reason;return false;}
+ const comp={id:uid(),name:'CONMEBOL Libertadores',country:'América do Sul',continent:'América do Sul',libertadoresCompetition:true,libertadoresYear:target.year,libertadoresStage:'preliminary1',libertadoresQualifiers:built.qualifiers,libertadoresTies:[],libertadoresAwaitingNext:false,participants:built.participants,rounds:[],format:'47 clubes · três fases preliminares · oito grupos de quatro · mata-mata'};
+ const p1=[...(built.qualifiers.phase1||[])].map(x=>x.id).sort((a,b)=>clubRating(getClub(b)).overall-clubRating(getClub(a)).overall);
+ comp.libertadoresTies=[libertadoresCreateTie(p1[0],p1[5],'Fase 1 · Confronto 1'),libertadoresCreateTie(p1[1],p1[4],'Fase 1 · Confronto 2'),libertadoresCreateTie(p1[2],p1[3],'Fase 1 · Confronto 3')];
+ target.competitions.push(comp);delete target.libertadoresPendingReason;return true;
+}
 function advanceCountrySeason(country,sourceSeasonId){
  const source=seasons.find(s=>s.id===sourceSeasonId);
  if(!countrySeasonReady(country,source)){alert('Ainda existem jogos pendentes neste país.');return;}
@@ -974,6 +1205,7 @@ function advanceCountrySeason(country,sourceSeasonId){
   if(country==='Venezuela'||country==='Bolívia')buildSchedule(nextCompetition);
   target.competitions.push(nextCompetition);
  });
+ libertadoresMaybeCreateForSeason(source,target);
  save();renderCompetitions();
  alert(country==='Brasil'&&divisions.A&&divisions.B?'Temporada '+nextYear+' criada! Os quatro últimos da Série A foram rebaixados, e os quatro promovidos da Série B foram definidos. As forças acumuladas dos clubes foram preservadas.':country==='Colômbia'?'Temporada '+nextYear+' criada! Promovidos à Primera División: '+(colombiaPromotionStatus(sourceComps.find(c=>c.colombiaDivision==='Segunda División'))?.promoted||[]).map(id=>getClub(id)?.name||'').join(' e ')+'. Os rebaixados também foram substituídos, e as forças dos clubes foram preservadas.':'Temporada '+nextYear+' criada! Os participantes e as forças acumuladas dos clubes foram preservados.');
 }
