@@ -109,6 +109,17 @@ function ensureUruguay2026(){
   make('uru-segunda-regular-2026','Segunda División Profesional · Fase Regular','Segunda División Profesional','2026 · 14 clubes · 26 rodadas · ida e volta',[...segundaA,...segundaB],{uruguayType:'segunda-regular'})
  );
 }
+function migrateUruguayIntermedioCompetition(){
+ const season=seasons.find(s=>s.year===2026);if(!season)return;
+ const legacyA=season.competitions.find(c=>c.id==='uru-primera-intermedio-a-2026');
+ const legacyB=season.competitions.find(c=>c.id==='uru-primera-intermedio-b-2026');
+ if(season.competitions.some(c=>c.uruguayType==='intermedio')||(!legacyA&&!legacyB))return;
+ const zones={A:[...(legacyA?.participants||[])],B:[...(legacyB?.participants||[])]};
+ const ra=legacyA?.rounds||[],rb=legacyB?.rounds||[];
+ const rounds=Array.from({length:Math.max(ra.length,rb.length)},(_,i)=>({number:i+1,matches:[...(ra[i]?.matches||[]),...(rb[i]?.matches||[])]}));
+ const merged={...(legacyA||legacyB),id:'uru-primera-intermedio-2026',name:'Torneo Intermedio',division:'Primera División',format:'2026 · 2 séries de 8 clubes · 7 rodadas · final entre os líderes',uruguayType:'intermedio',zones,participants:[...zones.A,...zones.B],rounds};
+ season.competitions=season.competitions.filter(c=>c!==legacyA&&c!==legacyB);season.competitions.push(merged);
+}
 function ensureArgentina2026(){
  const findOrAdd=name=>{let club=clubs.find(c=>slugify(c.name)===slugify(name));if(!club){club={id:uid(),name,state:'',slug:slugify(name)};initializeClubRating(club);clubs.push(club);}return club.id;};
  const ids=names=>names.map(findOrAdd);
@@ -125,6 +136,7 @@ function ensureArgentina2026(){
 }
 ensureArgentina2026();
 ensureUruguay2026();
+migrateUruguayIntermedioCompetition();
 seasons.forEach(season=>season.competitions.forEach(competition=>{if(!competition.country)competition.country='Brasil';}));
 clubs.forEach(initializeClubRating);
 save();
@@ -273,7 +285,7 @@ function renderCompetitions(){
   const available=[...seasons].filter(s=>s.competitions.some(c=>(c.country||'Brasil')===country)).sort((a,b)=>b.year-a.year);
   const current=available[0]||null,canAdvance=countrySeasonReady(country,current);
   const list=current?current.competitions.filter(c=>(c.country||'Brasil')===country):[];
-  const primera=list.filter(c=>c.argentinaType==='primera'),uruguayFirst=list.filter(c=>['primera-apertura','intermedio-serie','primera-clausura'].includes(c.uruguayType)),uruguaySecond=list.filter(c=>['competencia-serie','segunda-regular'].includes(c.uruguayType));
+  const primera=list.filter(c=>c.argentinaType==='primera'),uruguayFirst=list.filter(c=>['primera-apertura','intermedio','intermedio-serie','primera-clausura'].includes(c.uruguayType)),uruguaySecond=list.filter(c=>['competencia-serie','segunda-regular'].includes(c.uruguayType));
   let html='';
   if(primera.length)html+='<button class="competition-open" data-open-competition="'+current.id+'|'+primera[0].id+'"><span><strong>Primera División</strong><small>Apertura e Clausura · '+primera[0].participants.length+' participantes</small></span><span class="competition-open-action">Abrir campeonato →</span></button>';
   if(uruguayFirst.length)html+='<button class="competition-open" data-open-competition="'+current.id+'|'+uruguayFirst[0].id+'"><span><strong>Primera División · Uruguai</strong><small>Apertura, Intermedio e Clausura · 16 clubes</small></span><span class="competition-open-action">Abrir campeonato →</span></button>';
@@ -603,6 +615,7 @@ function argentinaCompetitionDescription(c){
 }
 function buildSchedule(competition){
  if(competition.argentinaType){buildArgentinaSchedule(competition);return;}
+ if(competition.uruguayType==='intermedio'&&competition.zones){const zoneRounds=ids=>{const teams=[...ids],out=[];for(let r=0;r<teams.length-1;r++){const matches=[];for(let i=0;i<teams.length/2;i++){const x=teams[i],y=teams[teams.length-1-i],home=(r+i)%2===0?x:y;matches.push({home,away:home===x?y:x,homeGoals:null,awayGoals:null});}out.push(matches);teams.splice(1,0,teams.pop());}return out;};const a=zoneRounds(competition.zones.A||[]),b=zoneRounds(competition.zones.B||[]);competition.rounds=Array.from({length:Math.max(a.length,b.length)},(_,i)=>({number:i+1,matches:[...(a[i]||[]),...(b[i]||[])]}));return;}
  const teams=[...competition.participants];if(teams.length<2)return null;
  if(teams.length%2)teams.push(null);
  const size=teams.length,half=size/2,first=[];
@@ -694,7 +707,7 @@ function renderCompetitionDetail(seasonId,competitionId,section='table'){
   content='<div class="club-list">'+participants.map(club=>'<div class="club"><span>'+clubLink(club,club.name)+(club.state?' · '+esc(club.state):'')+'</span><span class="tag">'+clubRating(club).overall+'/100</span></div>').join('')+'</div>';
   if(!participants.length)content='<div class="empty">Nenhum clube inscrito nesta competição.</div>';
  }
- const argentinaPrimera=competition.argentinaType==='primera'?season.competitions.filter(c=>c.argentinaType==='primera'):[];const uruguayGroup=competition.uruguayType?(competition.uruguayType==='primera-apertura'||competition.uruguayType==='intermedio-serie'||competition.uruguayType==='primera-clausura'?'first':'second'):null;const uruguayCompetitions=uruguayGroup?season.competitions.filter(c=>uruguayGroup==='first'?['primera-apertura','intermedio-serie','primera-clausura'].includes(c.uruguayType):['competencia-serie','segunda-regular'].includes(c.uruguayType)):[];const competitionTitle=competition.argentinaType==='primera'?'Primera División':uruguayGroup==='first'?'Primera División':uruguayGroup==='second'?'Segunda División':competition.name;const uruguayLabel=c=>c.uruguayType==='primera-apertura'?'Torneo Apertura':c.uruguayType==='intermedio-serie'?c.name:c.uruguayType==='primera-clausura'?'Torneo Clausura':c.uruguayType==='segunda-regular'?'Fase Regular':c.name;view.innerHTML='<div class="competition-detail-head"><button class="btn secondary" id="back-competitions">← Voltar às competições</button><span class="tag">TEMPORADA '+season.year+' · '+esc(season.status)+'</span></div><div class="panel"><div class="panel-head"><div><span class="eyebrow">'+esc(competition.country||'Brasil').toUpperCase()+'</span><h2>'+esc(competitionTitle)+'</h2>'+(argentinaPrimera.length>1?'<div class="field phase-selector"><label for="argentina-phase">Torneio da temporada</label><select id="argentina-phase">'+argentinaPrimera.map(c=>'<option value="'+c.id+'" '+(c.id===competition.id?'selected':'')+'>'+esc(c.phase)+'</option>').join('')+'</select></div>':uruguayCompetitions.length>1?'<div class="field phase-selector"><label for="uruguay-competition">Campeonato da temporada</label><select id="uruguay-competition">'+uruguayCompetitions.map(c=>'<option value="'+c.id+'" '+(c.id===competition.id?'selected':'')+'>'+esc(uruguayLabel(c))+'</option>').join('')+'</select></div>':'')+'</div><span class="tag">'+participants.length+' CLUBES</span></div><div class="competition-tabs">'+tabs.map(([key,label])=>'<button class="competition-tab '+(section===key?'active':'')+'" data-competition-tab="'+key+'">'+label+'</button>').join('')+'</div><div class="competition-section">'+content+'</div></div>';
+ const argentinaPrimera=competition.argentinaType==='primera'?season.competitions.filter(c=>c.argentinaType==='primera'):[];const uruguayGroup=competition.uruguayType?(competition.uruguayType==='primera-apertura'||competition.uruguayType==='intermedio'||competition.uruguayType==='intermedio-serie'||competition.uruguayType==='primera-clausura'?'first':'second'):null;const uruguayCompetitions=uruguayGroup?season.competitions.filter(c=>uruguayGroup==='first'?['primera-apertura','intermedio-serie','primera-clausura'].includes(c.uruguayType):['competencia-serie','segunda-regular'].includes(c.uruguayType)):[];const competitionTitle=competition.argentinaType==='primera'?'Primera División':uruguayGroup==='first'?'Primera División':uruguayGroup==='second'?'Segunda División':competition.name;const uruguayLabel=c=>c.uruguayType==='primera-apertura'?'Torneo Apertura':c.uruguayType==='intermedio'?'Torneo Intermedio':c.uruguayType==='intermedio-serie'?c.name:c.uruguayType==='primera-clausura'?'Torneo Clausura':c.uruguayType==='segunda-regular'?'Fase Regular':c.name;view.innerHTML='<div class="competition-detail-head"><button class="btn secondary" id="back-competitions">← Voltar às competições</button><span class="tag">TEMPORADA '+season.year+' · '+esc(season.status)+'</span></div><div class="panel"><div class="panel-head"><div><span class="eyebrow">'+esc(competition.country||'Brasil').toUpperCase()+'</span><h2>'+esc(competitionTitle)+'</h2>'+(argentinaPrimera.length>1?'<div class="field phase-selector"><label for="argentina-phase">Torneio da temporada</label><select id="argentina-phase">'+argentinaPrimera.map(c=>'<option value="'+c.id+'" '+(c.id===competition.id?'selected':'')+'>'+esc(c.phase)+'</option>').join('')+'</select></div>':uruguayCompetitions.length>1?'<div class="field phase-selector"><label for="uruguay-competition">Campeonato da temporada</label><select id="uruguay-competition">'+uruguayCompetitions.map(c=>'<option value="'+c.id+'" '+(c.id===competition.id?'selected':'')+'>'+esc(uruguayLabel(c))+'</option>').join('')+'</select></div>':'')+'</div><span class="tag">'+participants.length+' CLUBES</span></div><div class="competition-tabs">'+tabs.map(([key,label])=>'<button class="competition-tab '+(section===key?'active':'')+'" data-competition-tab="'+key+'">'+label+'</button>').join('')+'</div><div class="competition-section">'+content+'</div></div>';
  document.querySelector('#back-competitions').addEventListener('click',renderCompetitions);const phaseSelect=document.querySelector('#argentina-phase');if(phaseSelect)phaseSelect.addEventListener('change',()=>renderCompetitionDetail(seasonId,phaseSelect.value,section));const uruguaySelect=document.querySelector('#uruguay-competition');if(uruguaySelect)uruguaySelect.addEventListener('change',()=>renderCompetitionDetail(seasonId,uruguaySelect.value,section));
  view.querySelectorAll('[data-competition-tab]').forEach(b=>b.addEventListener('click',()=>renderCompetitionDetail(seasonId,competitionId,b.dataset.competitionTab)));
  view.querySelectorAll('[data-open-club]').forEach(b=>b.addEventListener('click',()=>renderClubDetail(b.dataset.openClub,{type:'competition',seasonId,competitionId,section})));
