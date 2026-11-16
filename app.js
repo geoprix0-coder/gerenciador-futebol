@@ -327,10 +327,12 @@ function argentinaRelegationDecision(year){
  if(promedio.length<2||annual.length<2)return {ready:false,reason:'Ainda não há partidas suficientes para calcular os dois rebaixamentos.'};
  const lowestAverage=promedio[0],averageTied=promedio.filter(row=>Math.abs(row.average-lowestAverage.average)<1e-9);
  if(averageTied.length>1)return {ready:false,reason:'Há empate no último lugar dos promedios; é necessário disputar o desempate previsto no regulamento.',tie:'promedios',tied:averageTied.map(row=>row.id)};
- const annualBottom=annual[annual.length-1],annualTied=annual.filter(row=>row.points===annualBottom.points);
- if(annualTied.length>1)return {ready:false,reason:'Há empate na posição de rebaixamento da tabela anual; é necessário disputar o desempate previsto no regulamento.',tie:'anual',tied:annualTied.map(row=>row.id)};
+ const annualBottom=annual[annual.length-1];
+ const annualTied=annual.filter(row=>row.points===annualBottom.points);
+ const annualGoalDifference=annualBottom.gf-annualBottom.ga;
+ const samePointsAndGoalDifference=annualTied.filter(row=>(row.gf-row.ga)===annualGoalDifference);
  const annualRelegated=annualBottom.id===lowestAverage.id?annual[annual.length-2]:annualBottom;
- return {ready:true,relegated:[lowestAverage.id,annualRelegated.id],promedios:lowestAverage.id,annual:annualRelegated.id,average:lowestAverage.average,years:argentinaPromediosTable(year).years};
+ return {ready:true,relegated:[lowestAverage.id,annualRelegated.id],promedios:lowestAverage.id,annual:annualRelegated.id,average:lowestAverage.average,years:argentinaPromediosTable(year).years,annualTiebreak:annualTied.length>1?{criterion:samePointsAndGoalDifference.length>1?'saldo de gols e gols marcados':'saldo de gols',tied:annualTied.map(row=>row.id),goalDifference:annualGoalDifference}:null};
 }
 function repairArgentinaAdvancedGroups(){
  let changed=false;
