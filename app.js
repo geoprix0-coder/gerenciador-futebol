@@ -534,9 +534,33 @@ function peruCreatePrimeraPlayoffs(c){const s=seasons.find(x=>x.competitions.inc
 function peruSimulatePrimera(c){const p=c.peruPlayoffs;if(!p||p.stage==='completed'||p.awaitingNext)return;const ties=p.stage==='semifinals'?p.semifinals:[p.final];ties.filter(Boolean).forEach(t=>{if(!peruTieDone(t))chileSimulateTie(t);});if(ties.length&&ties.every(peruTieDone))p.awaitingNext=true;}
 function peruNextPrimera(c){const p=c.peruPlayoffs;if(!p?.awaitingNext)return false;if(p.stage==='semifinals'){const w=p.semifinals.map(chileTieWinner),annual=peruAnnualTable(seasons.find(s=>s.competitions.includes(c)).year);w.sort((a,b)=>annual.findIndex(r=>r.id===a)-annual.findIndex(r=>r.id===b));p.final=chileCreateTie(w[0],w[1],'Final nacional');p.stage='final';}else if(p.stage==='final'){p.champion=chileTieWinner(p.final);p.stage='completed';}p.awaitingNext=false;return true;}
 function peruTableHtml(rows,classes={}){return '<div class="table-wrap"><table class="standings"><thead><tr><th>#</th><th>Clube</th><th>P</th><th>J</th><th>V</th><th>E</th><th>D</th><th>GP</th><th>GC</th><th>SG</th></tr></thead><tbody>'+rows.map((r,i)=>'<tr class="'+(classes[r.id]||'')+'"><td>'+(i+1)+'</td><td class="team-name">'+clubLink(r.club,r.club.name)+'</td><td>'+r.points+'</td><td>'+r.played+'</td><td>'+r.wins+'</td><td>'+r.draws+'</td><td>'+r.losses+'</td><td>'+r.gf+'</td><td>'+r.ga+'</td><td>'+(r.gf-r.ga)+'</td></tr>').join('')+'</tbody></table></div>';}
+
+const PARAGUAY_PRIMERA_2026=[
+ ['2 de Mayo','Pedro Juan Caballero'],['Cerro Porteño','Asunción'],['Guaraní','Asunción'],['Libertad','Asunción'],
+ ['Sportivo Luqueño','Luque'],['Nacional','Asunción'],['Olimpia','Asunción'],['Recoleta FC','Asunción'],
+ ['Rubio Ñu','Asunción'],['Sportivo San Lorenzo','San Lorenzo'],['Sportivo Ameliano','Villeta'],['Sportivo Trinidense','Asunción']
+];
+const PARAGUAY_INTERMEDIA_2026=[
+ ['12 de Junio','Villa Hayes'],['3 de Noviembre','Asunción'],['Atlético Tembetary','Villa Elisa'],['Benjamín Aceval','Villa Hayes'],
+ ['Deportivo Capiatá','Capiatá'],['Deportivo Santaní','San Estanislao'],['Encarnación FC','Encarnación'],['Fernando de la Mora','Fernando de la Mora'],
+ ['General Caballero JLM','Juan León Mallorquín'],['Guaireña FC','Villarrica'],['Independiente FBC','Asunción'],['Paraguarí AC','Paraguarí'],
+ ['Resistencia SC','Asunción'],['Sol de América','Villa Elisa'],['Sportivo Carapeguá','Carapeguá'],['Tacuary','Asunción']
+];
+function ensureParaguay2026(){
+ const season=seasons.find(x=>x.year===2026);if(!season||season.competitions.some(c=>c.country==='Paraguai'))return;
+ const add=([name,city])=>{let club=clubs.find(c=>slugify(c.name)===slugify(name)&&c.country==='Paraguai');if(!club){club={id:uid(),name,state:city||'',slug:slugify(name),country:'Paraguai'};initializeClubRating(club);clubs.push(club);}return club.id;};
+ const first=PARAGUAY_PRIMERA_2026.map(add),second=PARAGUAY_INTERMEDIA_2026.map(add);
+ season.competitions.push(
+  {id:'par-primera-apertura-2026',name:'Copa de Primera · Torneo Apertura',country:'Paraguai',division:'Primera División',paraguayDivision:'Primera División',paraguayPhase:'Apertura',participants:[...first],format:'2026 · 12 clubes · 22 rodadas · turno e returno'},
+  {id:'par-primera-clausura-2026',name:'Copa de Primera · Torneo Clausura',country:'Paraguai',division:'Primera División',paraguayDivision:'Primera División',paraguayPhase:'Clausura',participants:[...first],format:'2026 · 12 clubes · 22 rodadas · turno e returno'},
+  {id:'par-intermedia-2026',name:'División Intermedia',country:'Paraguai',division:'División Intermedia',paraguayDivision:'División Intermedia',participants:second,format:'2026 · 16 clubes · 30 rodadas · turno e returno'}
+ );
+}
+
 ensurePeru2026();
 ensureEcuador2026();
 ensureChile2026();
+ensureParaguay2026();
 function migrateCountryScopedClubs(){
  const byId=new Map(clubs.map(c=>[c.id,c])),usage=new Map();
  seasons.forEach(season=>(season.competitions||[]).forEach(comp=>{
