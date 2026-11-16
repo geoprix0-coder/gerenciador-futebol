@@ -512,13 +512,13 @@ function render(page='inicio'){
  else {const desc={partidas:'As partidas serão geradas pelo calendário e terão resultados simulados automaticamente.',classificacao:'A classificação será calculada automaticamente a partir dos resultados das partidas.',historico:'As temporadas concluídas e as avaliações dos clubes ficarão registradas aqui.'};view.innerHTML='<div class="panel"><h3>'+labels[page]+'</h3><p class="muted">'+desc[page]+'</p><div class="empty">Este módulo será desenvolvido em uma próxima etapa.</div></div>';}
 }
 function resetTestMatches(){
- const hasTestData=seasons.some(s=>s.year!==2026||s.countryAdvancements||s.competitions.some(c=>(Array.isArray(c.rounds)&&c.rounds.length)||c.playoffs));
+ const hasTestData=seasons.some(s=>s.year!==2026||s.countryAdvancements||s.competitions.some(c=>(Array.isArray(c.rounds)&&c.rounds.length)||c.playoffs||c.chilePlayoffs||c.chileTitleTie));
  if(!hasTestData){alert('O sistema já está no estado inicial da temporada de 2026.');return;}
  if(!confirm('Isso apagará todos os calendários, resultados, mata-matas e temporadas posteriores a 2026. O sistema voltará à temporada de 2026 e restaurará a força inicial dos clubes. Os cadastros dos clubes e os participantes de 2026 serão mantidos. Continuar?'))return;
  seasons=seasons.filter(s=>s.year===2026);
  seasons.forEach(s=>{
   delete s.countryAdvancements;
-  s.competitions.forEach(c=>{delete c.rounds;delete c.playoffs;});
+  s.competitions.forEach(c=>{delete c.rounds;delete c.playoffs;delete c.chilePlayoffs;delete c.chileTitleTie;});
   s.status='Preparação';
  });
  clubs.forEach(club=>{initializeClubRating(club);club.overall=club.initialRating.overall;club.attack=club.initialRating.attack;club.defense=club.initialRating.defense;});
