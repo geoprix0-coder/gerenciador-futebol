@@ -627,13 +627,13 @@ function render(page='inicio'){
  else {const desc={partidas:'As partidas serão geradas pelo calendário e terão resultados simulados automaticamente.',classificacao:'A classificação será calculada automaticamente a partir dos resultados das partidas.',historico:'As temporadas concluídas e as avaliações dos clubes ficarão registradas aqui.'};view.innerHTML='<div class="panel"><h3>'+labels[page]+'</h3><p class="muted">'+desc[page]+'</p><div class="empty">Este módulo será desenvolvido em uma próxima etapa.</div></div>';}
 }
 function resetTestMatches(){
- const hasTestData=seasons.some(s=>s.year!==2026||s.countryAdvancements||s.competitions.some(c=>(Array.isArray(c.rounds)&&c.rounds.length)||c.playoffs||c.chilePlayoffs||c.chileTitleTie||c.peruPlayoffs||c.peruStage==='final'||c.peruStage==='playoffs'));
+ const hasTestData=seasons.some(s=>s.year!==2026||s.countryAdvancements||s.competitions.some(c=>(Array.isArray(c.rounds)&&c.rounds.length)||c.playoffs||c.chilePlayoffs||c.chileTitleTie||c.peruPlayoffs||c.peruStage==='final'||c.peruStage==='playoffs'||c.venezuelaStage&&c.venezuelaStage!==(c.venezuelaDivision==='Primera División'?'regular':'regional')||c.venezuelaRegularRounds||c.venezuelaFinalRounds||c.venezuelaRegionalRounds||c.venezuelaGroups||c.venezuelaTitleFinal||c.venezuelaKnockout));
  if(!hasTestData){alert('O sistema já está no estado inicial da temporada de 2026.');return;}
  if(!confirm('Isso apagará todos os calendários, resultados, mata-matas e temporadas posteriores a 2026. O sistema voltará à temporada de 2026 e restaurará a força inicial dos clubes. Os cadastros dos clubes e os participantes de 2026 serão mantidos. Continuar?'))return;
  seasons=seasons.filter(s=>s.year===2026);
  seasons.forEach(s=>{
   delete s.countryAdvancements;
-  s.competitions.forEach(c=>{delete c.rounds;delete c.playoffs;delete c.chilePlayoffs;delete c.chileTitleTie;delete c.ecuadorRegularRounds;delete c.ecuadorGroups;if(c.ecuadorDivision){c.ecuadorStage='regular';}delete c.peruPlayoffs;delete c.peruFinalGroups;delete c.peruBonus;delete c.peruRegionalRounds;delete c.peruFinalRounds;if(c.peruDivision==='Liga 2')c.peruStage='regional';});
+  s.competitions.forEach(c=>{delete c.rounds;delete c.playoffs;delete c.chilePlayoffs;delete c.chileTitleTie;delete c.ecuadorRegularRounds;delete c.ecuadorGroups;if(c.ecuadorDivision){c.ecuadorStage='regular';}delete c.peruPlayoffs;delete c.peruFinalGroups;delete c.peruBonus;delete c.peruRegionalRounds;delete c.peruFinalRounds;if(c.peruDivision==='Liga 2')c.peruStage='regional';delete c.venezuelaRegularRounds;delete c.venezuelaFinalRounds;delete c.venezuelaRegionalRounds;delete c.venezuelaGroups;delete c.venezuelaGroupWinners;delete c.venezuelaTitleFinal;delete c.venezuelaKnockout;delete c.venezuelaQualified;if(c.venezuelaDivision==='Primera División')c.venezuelaStage='regular';if(c.venezuelaDivision==='Segunda División')c.venezuelaStage='regional';});
   s.status='Preparação';
  });
  clubs.forEach(club=>{initializeClubRating(club);club.overall=club.initialRating.overall;club.attack=club.initialRating.attack;club.defense=club.initialRating.defense;});
@@ -1391,7 +1391,7 @@ function renderCompetitionDetail(seasonId,competitionId,section='table'){
  const season=seasons.find(s=>s.id===seasonId),competition=season?.competitions.find(c=>c.id===competitionId);if(!season||!competition)return renderCompetitions();
  if(competition.chileDivision==='Primera B')competition.chileStageView=competition.chileStageView||'regular';if(competition.ecuadorDivision)competition.ecuadorStage=competition.ecuadorStage||'regular';if(competition.peruDivision==='Liga 2')competition.peruStage=competition.peruStage||'regional';if(competition.venezuelaDivision==='Primera División')competition.venezuelaStage=competition.venezuelaStage||'regular';if(competition.venezuelaDivision==='Segunda División')competition.venezuelaStage=competition.venezuelaStage||'regional';
  const participants=competition.participants.map(getClub).filter(Boolean).sort((a,b)=>a.name.localeCompare(b.name,'pt-BR'));
- if(section==='games'&&!competition.rounds?.length&&participants.length>=2&&(!competition.peruDivision||competition.peruDivision==='Primera División'||competition.peruStage==='regional')){buildSchedule(competition);save();}
+ if(section==='games'&&!competition.rounds?.length&&participants.length>=2&&!competition.venezuelaDivision&&(!competition.peruDivision||competition.peruDivision==='Primera División'||competition.peruStage==='regional')){buildSchedule(competition);save();}
  const tabs=[['table','Classificação'],['games','Jogos'],['clubs','Clubes']];
  let content='';
  if(section==='table'){
