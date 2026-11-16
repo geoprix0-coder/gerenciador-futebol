@@ -1368,6 +1368,16 @@ function renderPlayoffs(competition){
   return '<div class="playoff-tie"><div class="round-title"><strong>'+tie.name+'</strong><span class="tag">'+(winner?'Acesso garantido':'Em disputa')+'</span></div>'+tie.legs.map((m,i)=>'<div class="fixture"><span class="fixture-team">'+clubLink(getClub(m.home),getClub(m.home).name)+'</span><strong class="score">'+(m.homeGoals===null?'—':m.homeGoals+' × '+m.awayGoals)+'</strong><span class="fixture-team away">'+clubLink(getClub(m.away),getClub(m.away).name)+'</span><small class="leg-label">'+(i===0?'Jogo de ida':'Jogo de volta')+'</small></div>').join('')+'<div class="aggregate-line">Agregado: <strong>'+aggregate.a+' × '+aggregate.b+'</strong>'+(tie.penaltyWinner?' · Decisão nos pênaltis':'')+(winner?' · <span class="promoted-name">'+esc(getClub(winner).name)+' garantido na Série A</span>':'')+'</div></div>';
  }).join('')+(completed?'<p class="access-confirmation">Os dois vencedores do mata-mata garantiram o acesso à Série A na próxima temporada.</p>':'<div class="playoff-actions"><button class="btn" id="simulate-playoff-leg">Simular '+(ties.some(t=>t.legs[0].homeGoals===null)?'jogos de ida':'jogos de volta')+'</button></div>')+'</div>';
 }
+function venezuelaTableView(c){
+ if(c.venezuelaDivision==='Primera División'){
+  if(c.venezuelaStage==='regular')return '<div class="argentina-rules"><p>Fase regular · 13 rodadas. Os oito primeiros avançam aos quadrangulares.</p></div>'+peruTableHtml(getStandings({...c,rounds:c.venezuelaRegularRounds||c.rounds||[]}));
+  if(c.venezuelaStage==='quadrangular')return '<div class="argentina-rules"><p>Quadrangulares · os líderes de cada grupo avançam à final.</p></div>'+['A','B'].map(z=>'<h3 class="season-heading">Grupo '+z+'</h3>'+peruTableHtml(venezuelaGroupTable(c,z))).join('');
+  const f=c.venezuelaTitleFinal;return '<div class="playoff-panel"><h3>Final · '+esc(c.venezuelaPhase)+'</h3>'+(f?.completed?'<p class="access-confirmation">Campeão: '+esc(getClub(f.champion)?.name||'')+'</p>':'Aguardando simulação da final.')+'</div>';
+ }
+ const rounds=c.venezuelaRegionalRounds||c.rounds||[];
+ if(c.venezuelaStage==='regional')return '<div class="argentina-rules"><p>Fase regional · quatro primeiros de cada grupo avançam ao mata-mata.</p></div>'+['A','B'].map(z=>'<h3 class="season-heading">Grupo '+z+'</h3>'+peruTableHtml(getStandings({...c,participants:c.zones[z],rounds}))).join('');
+ const p=c.venezuelaKnockout;return '<div class="playoff-panel"><h3>Mata-mata de acesso</h3>'+venezuelaKnockoutHtml(p)+(p?.completed?'<p class="access-confirmation">Promovido: '+esc(getClub(p.champion)?.name||'')+'</p>':'')+'</div>';
+}
 function renderCompetitionDetail(seasonId,competitionId,section='table'){
   const phaseSeason=seasons.find(s=>s.id===seasonId),phaseComp=phaseSeason?.competitions.find(c=>c.id===competitionId);if(phaseComp?.colombiaTournaments){phaseComp.colombiaActivePhase=phaseComp.colombiaActivePhase||'Apertura';phaseComp.rounds=phaseComp.colombiaTournaments[phaseComp.colombiaActivePhase]?.rounds||[];}if(phaseComp?.colombiaTournaments)phaseComp.colombiaStageView=phaseComp.colombiaStageView||'first';
  const season=seasons.find(s=>s.id===seasonId),competition=season?.competitions.find(c=>c.id===competitionId);if(!season||!competition)return renderCompetitions();
@@ -1378,7 +1388,8 @@ function renderCompetitionDetail(seasonId,competitionId,section='table'){
  let content='';
  if(section==='table'){
   const standings=getStandings(competition);
-  if(competition.ecuadorDivision){
+  if(competition.venezuelaDivision)content=venezuelaTableView(competition);
+  else if(competition.ecuadorDivision){
    const groups=competition.ecuadorGroups||{},labels=competition.ecuadorDivision==='Serie A'?{title:'Hexagonal do título',sudamericana:'Quadrangular da Sul-Americana',descenso:'Hexagonal do descenso'}:{ascenso:'Hexagonal do ascenso',descenso:'Hexagonal da permanência'};
    const groupKeys=competition.ecuadorStage==='final'?Object.keys(groups):[];
    const rules=competition.ecuadorDivision==='Serie A'?'16 clubes: fase inicial em turno e returno (30 rodadas); depois, hexagonal do título, quadrangular por vaga continental e hexagonal do descenso. Os dois últimos do hexagonal do descenso são rebaixados à Serie B.':'12 clubes: fase classificatória em ida e volta (22 rodadas); depois, hexagonais de ascenso e de permanência. Os dois primeiros do grupo de ascenso conquistam o acesso à Serie A; o grupo de permanência define a manutenção na Serie B.';
