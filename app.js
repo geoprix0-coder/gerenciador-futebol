@@ -207,12 +207,17 @@ function colombiaAnnualTable(year,division='Primera División'){
  return colombiaTableSort([...totals.values()]);
 }
 function colombiaPromediosTable(year){
+ const currentSeason=seasons.find(s=>s.year===year);
+ const currentCompetition=currentSeason?.competitions.find(c=>c.country==='Colômbia'&&c.colombiaDivision==='Primera División');
+ if(!currentCompetition)return {years:[],rows:[]};
+ const activeIds=new Set(currentCompetition.participants);
  const years=[year-1,year].filter(y=>seasons.some(s=>s.year===y&&s.competitions.some(c=>c.country==='Colômbia'&&c.colombiaDivision==='Primera División')));
- const totals=new Map();
+ const totals=new Map([...activeIds].map(id=>[id,{id,points:0,played:0}]));
  years.forEach(y=>{
   const season=seasons.find(s=>s.year===y),comp=season?.competitions.find(c=>c.country==='Colômbia'&&c.colombiaDivision==='Primera División');
   if(!comp)return;
   ['Apertura','Clausura'].forEach(phase=>colombiaPhaseStats(comp,phase).forEach((row,id)=>{
+   if(!activeIds.has(id))return;
    if(!totals.has(id))totals.set(id,{id,points:0,played:0});
    const total=totals.get(id);total.points+=row.points;total.played+=row.played;
   }));
