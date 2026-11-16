@@ -13,6 +13,16 @@ const ARGENTINA_NACIONAL_2026={
  A:['All Boys','Ferro Carril Oeste','Deportivo Madryn','Chaco For Ever','Deportivo Morón','Estudiantes de Buenos Aires','Racing de Córdoba','Los Andes','Mitre de Santiago del Estero','Almirante Brown','Ciudad de Bolívar','Colón','Central Norte','Godoy Cruz','San Telmo','San Miguel','Defensores de Belgrano','Acassuso'],
  B:['Nueva Chicago','Chacarita Juniors','Atlanta','San Martín de Tucumán','Gimnasia y Esgrima de Jujuy','Almagro','San Martín de San Juan','Temperley','Güemes','Tristán Suárez','Agropecuario','Patronato','Gimnasia y Tiro','Deportivo Maipú','Quilmes','Colegiales','Atlético de Rafaela','Midland']
 };
+const URUGUAY_PRIMERA_2026=[
+ ['Albion','Montevideo'],['Boston River','Florida'],['Central Español','Montevideo'],['Cerro','Montevideo'],
+ ['Cerro Largo','Cerro Largo'],['Danubio','Montevideo'],['Defensor Sporting','Montevideo'],['Deportivo Maldonado','Maldonado'],
+ ['Juventud','Canelones'],['Liverpool','Montevideo'],['Montevideo City Torque','Montevideo'],['Montevideo Wanderers','Montevideo'],
+ ['Nacional','Montevideo'],['Peñarol','Montevideo'],['Progreso','Montevideo'],['Racing','Montevideo']
+];
+const URUGUAY_SEGUNDA_2026={
+ A:[['Huracán','Montevideo'],['Atenas','Maldonado'],['Tacuarembó','Tacuarembó'],['La Luz','Montevideo'],['Uruguay Montevideo','Montevideo'],['Cerrito','Montevideo'],['Fénix','Montevideo']],
+ B:[['River Plate','Montevideo'],['Oriental','Canelones'],['Rentistas','Montevideo'],['Plaza Colonia','Colonia'],['Paysandú','Paysandú'],['Miramar Misiones','Montevideo'],['Colón','Montevideo']]
+};
 const ARGENTINA_CLASICOS_2026=[
  ['Vélez Sarsfield','River Plate'],['Barracas Central','Platense'],['Talleres','Rosario Central'],
  ['Sarmiento','Estudiantes de La Plata'],['Defensa y Justicia','Belgrano'],['Argentinos Juniors','Lanús'],
@@ -77,6 +87,24 @@ function initializeClubRating(club){
  const defense=Number.isFinite(club.defense)?boundedRating(club.defense):boundedRating(overall+randomInt(-9,9));
  club.overall=overall;club.attack=attack;club.defense=defense;club.initialRating={overall,attack,defense};
 }
+function ensureUruguay2026(){
+ const findOrAdd=(name,department)=>{let club=clubs.find(c=>slugify(c.name)===slugify(name));if(!club){club={id:uid(),name,state:department||'',slug:slugify(name)};initializeClubRating(club);clubs.push(club);}return club.id;};
+ const existing=seasons.find(s=>s.year===2026);if(!existing)return;
+ if(existing.competitions.some(c=>c.country==='Uruguai'))return;
+ const ids=list=>list.map(([name,department])=>findOrAdd(name,department));
+ const primera=ids(URUGUAY_PRIMERA_2026);
+ const segundaA=ids(URUGUAY_SEGUNDA_2026.A),segundaB=ids(URUGUAY_SEGUNDA_2026.B);
+ const make=(id,name,division,format,participants,extra={})=>({id,name,country:'Uruguai',division,format,participants,...extra});
+ existing.competitions.push(
+  make('uru-primera-apertura-2026','Liga AUF Uruguaya · Torneo Apertura','Primera División','2026 · 16 clubes · 15 rodadas · turno único',primera,{uruguayType:'primera-apertura',singleRound:true}),
+  make('uru-primera-intermedio-a-2026','Torneo Intermedio · Série A','Torneo Intermedio','2026 · 8 clubes · 7 rodadas · turno único',primera.slice(0,8),{uruguayType:'intermedio-serie',singleRound:true}),
+  make('uru-primera-intermedio-b-2026','Torneo Intermedio · Série B','Torneo Intermedio','2026 · 8 clubes · 7 rodadas · turno único',primera.slice(8),{uruguayType:'intermedio-serie',singleRound:true}),
+  make('uru-primera-clausura-2026','Liga AUF Uruguaya · Torneo Clausura','Primera División','2026 · 16 clubes · 15 rodadas · turno único',primera,{uruguayType:'primera-clausura',singleRound:true}),
+  make('uru-segunda-competencia-a-2026','Torneo Competencia · Série A','Segunda División Profesional','2026 · 7 clubes · 7 rodadas · turno único',segundaA,{uruguayType:'competencia-serie',singleRound:true}),
+  make('uru-segunda-competencia-b-2026','Torneo Competencia · Série B','Segunda División Profesional','2026 · 7 clubes · 7 rodadas · turno único',segundaB,{uruguayType:'competencia-serie',singleRound:true}),
+  make('uru-segunda-regular-2026','Segunda División Profesional · Fase Regular','Segunda División Profesional','2026 · 14 clubes · 26 rodadas · ida e volta',[...segundaA,...segundaB],{uruguayType:'segunda-regular'})
+ );
+}
 function ensureArgentina2026(){
  const findOrAdd=name=>{let club=clubs.find(c=>slugify(c.name)===slugify(name));if(!club){club={id:uid(),name,state:'',slug:slugify(name)};initializeClubRating(club);clubs.push(club);}return club.id;};
  const ids=names=>names.map(findOrAdd);
@@ -92,6 +120,7 @@ function ensureArgentina2026(){
  }
 }
 ensureArgentina2026();
+ensureUruguay2026();
 seasons.forEach(season=>season.competitions.forEach(competition=>{if(!competition.country)competition.country='Brasil';}));
 clubs.forEach(initializeClubRating);
 save();
@@ -574,7 +603,7 @@ function buildSchedule(competition){
   for(let i=0;i<half;i++){const a=teams[i],b=teams[size-1-i];if(a&&b){const home=(round+i)%2===0?a:b,away=home===a?b:a;matches.push({home,away,homeGoals:null,awayGoals:null});}}
   first.push({number:round+1,matches});teams.splice(1,0,teams.pop());
  }
- competition.rounds=first.concat(first.map((r,i)=>({number:size-1+i+1,matches:r.matches.map(m=>({home:m.away,away:m.home,homeGoals:null,awayGoals:null}))})));
+ competition.rounds=competition.singleRound?first:first.concat(first.map((r,i)=>({number:size-1+i+1,matches:r.matches.map(m=>({home:m.away,away:m.home,homeGoals:null,awayGoals:null}))})));
 }
 function simulateMatch(match){
  const homeClub=getClub(match.home),awayClub=getClub(match.away);
