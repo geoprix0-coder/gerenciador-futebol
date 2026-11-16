@@ -84,3 +84,9 @@
 .country-heading h2{margin:0;font:800 17px Manrope;color:var(--accent)}
 .country-group .season-heading{margin-top:20px}
 @media(max-width:600px){.country-heading{align-items:flex-start;flex-direction:column}}
+
+
+/* Country season advancement control */
+.country-heading-actions{display:flex;align-items:center;justify-content:flex-end;gap:10px;flex-wrap:wrap}
+.country-advance{white-space:nowrap}
+@media(max-width:700px){.country-heading-actions{justify-content:flex-start}.country-advance{white-space:normal}}
