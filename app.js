@@ -824,6 +824,7 @@ function advanceCountrySeason(country,sourceSeasonId){
  const divisions={A:sourceComps.find(c=>c.division==='A'),B:sourceComps.find(c=>c.division==='B')};
  const nextParticipants=new Map(sourceComps.map(c=>[c.id,[...c.participants]]));
  const nextZones=new Map();
+ const nextGroups=new Map();
  if(country==='Argentina'){
   const first=sourceComps.find(c=>c.argentinaType==='primera'),second=sourceComps.find(c=>c.argentinaType==='nacional');
   if(first&&second){
@@ -914,6 +915,23 @@ function advanceCountrySeason(country,sourceSeasonId){
    nextParticipants.set(second.id,[...second.participants.filter(id=>!promoted.includes(id)),...relegated]);
   }
  }
+ if(country==='Bolívia'){
+  const first=sourceComps.find(c=>c.boliviaDivision==='Primera División'),cup=sourceComps.find(c=>c.boliviaDivision==='Copa de la División Profesional'),second=sourceComps.find(c=>c.boliviaDivision==='Copa Simón Bolívar');
+  const rows=first?getStandings(first):[],simon=second?.boliviaKnockout,indirect=first?chileTieWinner(first.boliviaIndirectPlayoff):null;
+  if(!first||!cup||!second||rows.length!==16||rows.some(r=>r.played!==30)||!cup.boliviaKnockout?.completed||!simon?.completed||!simon.champion||!simon.runnerUp||!indirect){alert('Não foi possível definir os acessos e rebaixamentos da Bolívia. Conclua a Liga, a Copa da División Profesional, a Simón Bolívar e o playoff indireto.');return;}
+  const directRelegated=rows[15].id,penultimate=rows[14].id,promoted=[simon.champion],relegated=[directRelegated];
+  if(indirect===simon.runnerUp){promoted.push(simon.runnerUp);relegated.push(penultimate);}
+  const replaceGroups=(groups,outgoing,incoming)=>{
+   const next=Object.fromEntries(Object.entries(groups||{}).map(([k,ids])=>[k,[...ids]]));
+   for(let i=0;i<outgoing.length;i++){const key=Object.keys(next).find(k=>next[k].includes(outgoing[i]));if(!key)return null;next[key][next[key].indexOf(outgoing[i])]=incoming[i];}
+   return next;
+  };
+  const newCupGroups=replaceGroups(cup.boliviaGroups,relegated,promoted),newSecondGroups=replaceGroups(second.boliviaGroups,promoted,relegated);
+  if(!newCupGroups||!newSecondGroups){alert('Não foi possível localizar os clubes promovidos/rebaixados nos grupos bolivianos.');return;}
+  nextParticipants.set(first.id,[...first.participants.filter(id=>!relegated.includes(id)),...promoted]);
+  nextGroups.set(cup.id,newCupGroups);nextParticipants.set(cup.id,Object.values(newCupGroups).flat());
+  nextGroups.set(second.id,newSecondGroups);nextParticipants.set(second.id,Object.values(newSecondGroups).flat());
+ }
  if(country==='Brasil'&&divisions.A&&divisions.B){
   const relegated=getStandings(divisions.A).slice(-4).map(r=>r.id);
   const bStandings=getStandings(divisions.B);
@@ -932,8 +950,8 @@ function advanceCountrySeason(country,sourceSeasonId){
  source.countryAdvancements=source.countryAdvancements||{};
  source.countryAdvancements[country]=nextYear;
  sourceComps.forEach(comp=>{
-  const nextCompetition={...Object.fromEntries(Object.entries(comp).filter(([k])=>!['rounds','playoffs','argentinaPlayoffs','uruguayChampionship','uruguayAccess','uruguayIntermedioFinal','uruguayCompetenciaFinal','colombiaPromotion','chilePlayoffs','chileTitleTie','peruPlayoffs','peruFinalGroups','peruBonus','peruRegionalRounds','peruFinalRounds','ecuadorRegularRounds','ecuadorFinalRounds','ecuadorGroups','venezuelaStage','venezuelaRegularRounds','venezuelaFinalRounds','venezuelaRegionalRounds','venezuelaGroups','venezuelaGroupWinners','venezuelaTitleFinal','venezuelaKnockout','venezuelaQualified'].includes(k))),id:uid(),name:comp.name,country,division:comp.division||'',participants:nextParticipants.get(comp.id)||[...comp.participants],...(nextZones.has(comp.id)?{zones:nextZones.get(comp.id)}:{}),...(comp.peruDivision==='Liga 2'?{peruStage:'regional'}:{}),...(comp.ecuadorDivision?{ecuadorStage:'regular'}:{}),...(comp.colombiaTournaments?{colombiaTournaments:{Apertura:{label:'Apertura',rounds:[]},Clausura:{label:'Clausura',rounds:[]}},colombiaActivePhase:'Apertura',colombiaStageView:'first'}:{}),...(country==='Venezuela'?{venezuelaSeasonInitialized:true}:{}),format:comp.format||'A definir'};
-  if(country==='Venezuela')buildSchedule(nextCompetition);
+  const nextCompetition={...Object.fromEntries(Object.entries(comp).filter(([k])=>!['rounds','playoffs','argentinaPlayoffs','uruguayChampionship','uruguayAccess','uruguayIntermedioFinal','uruguayCompetenciaFinal','colombiaPromotion','chilePlayoffs','chileTitleTie','peruPlayoffs','peruFinalGroups','peruBonus','peruRegionalRounds','peruFinalRounds','ecuadorRegularRounds','ecuadorFinalRounds','ecuadorGroups','venezuelaStage','venezuelaRegularRounds','venezuelaFinalRounds','venezuelaRegionalRounds','venezuelaGroups','venezuelaGroupWinners','venezuelaTitleFinal','venezuelaKnockout','venezuelaQualified','boliviaStage','boliviaGroupRounds','boliviaKnockout','boliviaQualified','boliviaIndirectPlayoff'].includes(k))),id:uid(),name:comp.name,country,division:comp.division||'',participants:nextParticipants.get(comp.id)||[...comp.participants],...(nextZones.has(comp.id)?{zones:nextZones.get(comp.id)}:{}),...(nextGroups.has(comp.id)?{boliviaGroups:nextGroups.get(comp.id)}:{}),...(comp.peruDivision==='Liga 2'?{peruStage:'regional'}:{}),...(comp.ecuadorDivision?{ecuadorStage:'regular'}:{}),...(comp.colombiaTournaments?{colombiaTournaments:{Apertura:{label:'Apertura',rounds:[]},Clausura:{label:'Clausura',rounds:[]}},colombiaActivePhase:'Apertura',colombiaStageView:'first'}:{}),...(country==='Venezuela'?{venezuelaSeasonInitialized:true}:{}),...(['Copa de la División Profesional','Copa Simón Bolívar'].includes(comp.boliviaDivision)?{boliviaStage:'groups'}:{}),format:comp.format||'A definir'};
+  if(country==='Venezuela'||country==='Bolívia')buildSchedule(nextCompetition);
   target.competitions.push(nextCompetition);
  });
  save();renderCompetitions();
