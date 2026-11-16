@@ -93,9 +93,9 @@ const MATCH_IMPORTANCE=[
  {id:'nations_final',label:'Liga das Nações · finais/playoffs',weight:25},
  {id:'qualifiers',label:'Eliminatórias continentais ou da Copa do Mundo',weight:25},
  {id:'continental_group',label:'Torneio continental · até as quartas',weight:35},
- {id:'continental_qf',label:'Torneio continental · quartas em diante',weight:40},
+ {id:'continental_qf',label:'Torneio continental · quartas em diante',weight:40,protectKnockout:true},
  {id:'worldcup_group',label:'Copa do Mundo · grupos/oitavas',weight:50},
- {id:'worldcup_qf',label:'Copa do Mundo · quartas em diante',weight:60}
+ {id:'worldcup_qf',label:'Copa do Mundo · quartas em diante',weight:60,protectKnockout:true}
 ];
 const INTERNATIONAL_COMPETITIONS=[
  {name:'Copa do Mundo FIFA',confederation:'FIFA',type:'Torneio mundial',detail:'Fase final mundial e eliminatórias classificatórias'},
@@ -143,14 +143,16 @@ function recordInternationalMatch(form){
   penaltyWinner=winner==='home'?home.id:away.id;
  }
  const expectedHome=selectionMatchExpected(home,away),expectedAway=1-expectedHome;
- const deltaHome=type.weight*(homeOutcome-expectedHome);
+ let deltaHome=type.weight*(homeOutcome-expectedHome);
  const awayOutcome=homeGoals===awayGoals?(penaltyWinner?(penaltyWinner===away.id?0.75:0.5):0.5):(1-homeOutcome);
- const deltaAway=type.weight*(awayOutcome-expectedAway);
+ let deltaAway=type.weight*(awayOutcome-expectedAway);
+ const protectKnockout=!!type.protectKnockout||!!form.knockoutProtection.checked;
+ if(protectKnockout){if(deltaHome<0)deltaHome=0;if(deltaAway<0)deltaAway=0;}
  const beforeHome=home.points,beforeAway=away.points;
  home.points=Number((home.points+deltaHome).toFixed(2));away.points=Number((away.points+deltaAway).toFixed(2));
  home.matches=(home.matches||0)+1;away.matches=(away.matches||0)+1;
  const date=form.matchDate.value||new Date().toISOString().slice(0,10);
- const match={id:uid(),date,home:home.id,away:away.id,homeGoals,awayGoals,type:type.id,typeLabel:type.label,weight:type.weight,penaltyWinner,homeBefore:beforeHome,awayBefore:beforeAway,homeDelta:Number(deltaHome.toFixed(2)),awayDelta:Number(deltaAway.toFixed(2)),homeAfter:home.points,awayAfter:away.points};
+ const match={id:uid(),date,home:home.id,away:away.id,homeGoals,awayGoals,type:type.id,typeLabel:type.label,weight:type.weight,protectKnockout,penaltyWinner,homeBefore:beforeHome,awayBefore:beforeAway,homeDelta:Number(deltaHome.toFixed(2)),awayDelta:Number(deltaAway.toFixed(2)),homeAfter:home.points,awayAfter:away.points};
  internationalMatches.unshift(match);
  home.history=home.history||[];away.history=away.history||[];
  home.history.unshift({date,opponent:away.id,score:homeGoals+'–'+awayGoals,delta:match.homeDelta,points:home.points});
@@ -173,7 +175,7 @@ function renderSelections(tab=activeSelectionTab){
   const sortedTeams=nationalTeams.slice().sort((a,b)=>a.name.localeCompare(b.name,'pt-BR'));
   const teamOptions=sortedTeams.map(t=>'<option value="'+t.id+'">'+flagEmoji(t.iso)+' '+esc(t.name)+'</option>').join('');
   const awayOptions=sortedTeams.map((t,i)=>'<option value="'+t.id+'" '+(i===1?'selected':'')+'>'+flagEmoji(t.iso)+' '+esc(t.name)+'</option>').join('');
-  content+='<div class="panel"><h3>Registrar resultado internacional</h3><p class="muted">O resultado atualiza imediatamente os pontos das duas seleções pelo modelo SUM inspirado no ranking FIFA.</p><form id="international-match-form"><div class="selection-match-grid"><div class="field"><label>Seleção mandante</label><select name="home" required>'+teamOptions+'</select></div><div class="field"><label>Seleção visitante</label><select name="away" required>'+awayOptions+'</select></div><div class="field"><label>Gols · mandante</label><input name="homeGoals" type="number" min="0" max="30" value="1" required></div><div class="field"><label>Gols · visitante</label><input name="awayGoals" type="number" min="0" max="30" value="0" required></div><div class="field"><label>Importância da partida</label><select name="matchType">'+MATCH_IMPORTANCE.map(t=>'<option value="'+t.id+'">'+t.label+' · peso '+t.weight+'</option>').join('')+'</select></div><div class="field"><label>Data</label><input name="matchDate" type="date" value="'+new Date().toISOString().slice(0,10)+'" required></div><div class="field penalty-field"><label>Vencedora nos pênaltis (se houver empate)</label><select name="penaltyWinner"><option value="">Não houve disputa</option><option value="home">Seleção mandante</option><option value="away">Seleção visitante</option></select></div></div><button class="btn" type="submit">Registrar partida e atualizar ranking</button></form></div>';
+  content+='<div class="panel"><h3>Registrar resultado internacional</h3><p class="muted">O resultado atualiza imediatamente os pontos das duas seleções pelo modelo SUM inspirado no ranking FIFA.</p><form id="international-match-form"><div class="selection-match-grid"><div class="field"><label>Seleção mandante</label><select name="home" required>'+teamOptions+'</select></div><div class="field"><label>Seleção visitante</label><select name="away" required>'+awayOptions+'</select></div><div class="field"><label>Gols · mandante</label><input name="homeGoals" type="number" min="0" max="30" value="1" required></div><div class="field"><label>Gols · visitante</label><input name="awayGoals" type="number" min="0" max="30" value="0" required></div><div class="field"><label>Importância da partida</label><select name="matchType">'+MATCH_IMPORTANCE.map(t=>'<option value="'+t.id+'">'+t.label+' · peso '+t.weight+'</option>').join('')+'</select></div><div class="field"><label>Data</label><input name="matchDate" type="date" value="'+new Date().toISOString().slice(0,10)+'" required></div><div class="field penalty-field"><label>Vencedora nos pênaltis (se houver empate)</label><select name="penaltyWinner"><option value="">Não houve disputa</option><option value="home">Seleção mandante</option><option value="away">Seleção visitante</option></select></div><div class="field knockout-protection-field"><label><input name="knockoutProtection" type="checkbox"> Fase eliminatória de torneio final (proteger contra perda de pontos)</label></div></div><button class="btn" type="submit">Registrar partida e atualizar ranking</button></form></div>';
   content+='<div class="panel"><div class="panel-head"><h3>Histórico de partidas</h3><span class="tag">'+internationalMatches.length+' REGISTRADAS</span></div>'+(internationalMatches.length?'<div class="table-wrap"><table class="standings selection-match-table"><thead><tr><th>Data</th><th>Partida</th><th>Placar</th><th>Peso</th><th>Variação</th></tr></thead><tbody>'+internationalMatches.map(m=>{const h=getNationalTeam(m.home),a=getNationalTeam(m.away);return '<tr><td>'+esc(m.date)+'</td><td class="team-name">'+flagEmoji(h?.iso)+' '+esc(h?.name||'')+' × '+flagEmoji(a?.iso)+' '+esc(a?.name||'')+'</td><td>'+m.homeGoals+'–'+m.awayGoals+(m.penaltyWinner?' (pên.)':'')+'</td><td>'+m.weight+'</td><td><span class="'+(m.homeDelta>=0?'points-up':'points-down')+'">'+(m.homeDelta>0?'+':'')+m.homeDelta+'</span> / <span class="'+(m.awayDelta>=0?'points-up':'points-down')+'">'+(m.awayDelta>0?'+':'')+m.awayDelta+'</span></td></tr>';}).join('')+'</tbody></table></div>':'<div class="empty">Nenhuma partida internacional registrada.</div>')+'</div>';
  }else{
   content+='<div class="panel"><h3>Competições internacionais previstas</h3><p class="muted">Catálogo inicial de competições para as seleções masculinas. O peso aplicado ao ranking depende da fase e do tipo exato da partida.</p>'+INTERNATIONAL_COMPETITIONS.map(c=>'<div class="competition-row"><div><strong>'+esc(c.name)+'</strong><small>'+esc(c.detail)+'</small></div><span class="tag">'+esc(c.confederation)+'</span></div>').join('')+'</div>';
