@@ -406,6 +406,80 @@ function ensureArgentina2026(){
 }
 ensureArgentina2026();
 ensureUruguay2026();
+
+const CHILE_PRIMERA_2026=[
+ ['Audax Italiano','Santiago'],['Cobresal','El Salvador'],['Colo-Colo','Santiago'],['Coquimbo Unido','Coquimbo'],
+ ['Deportes Concepción','Concepción'],['Deportes La Serena','La Serena'],['Deportes Limache','Limache'],['Everton','Viña del Mar'],
+ ['Huachipato','Talcahuano'],['Ñublense','Chillán'],["O'Higgins",'Rancagua'],['Palestino','Santiago'],
+ ['Unión La Calera','La Calera'],['Universidad Católica','Santiago'],['Universidad de Chile','Santiago'],['Universidad de Concepción','Concepción']
+];
+const CHILE_PRIMERA_B_2026=[
+ ['Antofagasta','Antofagasta'],['San Luis','Quillota'],['Cobreloa','Calama'],['Deportes Copiapó','Copiapó'],
+ ['Curicó Unido','Curicó'],['Deportes Iquique','Iquique'],['Deportes Recoleta','Recoleta'],['Deportes Santa Cruz','Santa Cruz'],
+ ['Deportes Temuco','Temuco'],['Magallanes','San Bernardo'],['Deportes Puerto Montt','Puerto Montt'],['Rangers','Talca'],
+ ['San Marcos de Arica','Arica'],['Unión Española','Santiago'],['Unión San Felipe','San Felipe'],['Santiago Wanderers','Valparaíso']
+];
+function ensureChile2026(){
+ const season=seasons.find(s=>s.year===2026);if(!season||season.competitions.some(c=>c.country==='Chile'))return;
+ const findOrAdd=(name,city)=>{let club=clubs.find(c=>slugify(c.name)===slugify(name));if(!club){club={id:uid(),name,state:city||'',slug:slugify(name)};initializeClubRating(club);clubs.push(club);}return club.id;};
+ const ids=list=>list.map(([name,city])=>findOrAdd(name,city));
+ season.competitions.push(
+  {id:'chi-primera-2026',name:'Liga de Primera · Chile',country:'Chile',division:'Primera División',chileDivision:'Primera División',participants:ids(CHILE_PRIMERA_2026),format:'2026 · 16 clubes · 30 rodadas · turno e returno'},
+  {id:'chi-primera-b-2026',name:'Liga de Ascenso · Primera B',country:'Chile',division:'Primera B',chileDivision:'Primera B',participants:ids(CHILE_PRIMERA_B_2026),format:'2026 · 16 clubes · 30 rodadas · turno e returno + liguilla'}
+ );
+}
+function chileCreateTie(a,b,name){
+ return {name,home:a,away:b,legs:[{home:b,away:a,homeGoals:null,awayGoals:null},{home:a,away:b,homeGoals:null,awayGoals:null}],penaltyWinner:null};
+}
+function chileAggregate(t){
+ let a=0,b=0;(t.legs||[]).forEach(m=>{if(m.homeGoals===null||m.awayGoals===null)return;if(m.home===t.home){a+=m.homeGoals;b+=m.awayGoals;}else{b+=m.homeGoals;a+=m.awayGoals;}});
+ return {a,b};
+}
+function chileTieWinner(t){
+ if(!t||!t.legs||t.legs.some(m=>m.homeGoals===null||m.awayGoals===null))return null;
+ const x=chileAggregate(t);return x.a>x.b?t.home:x.b>x.a?t.away:t.penaltyWinner||null;
+}
+function chileSimulateTie(t){
+ const i=t.legs.findIndex(m=>m.homeGoals===null||m.awayGoals===null);if(i<0)return;
+ simulateMatch(t.legs[i]);
+ if(i===1){const x=chileAggregate(t);if(x.a===x.b)t.penaltyWinner=Math.random()<.5?t.home:t.away;}
+}
+function chileCreateTitleTie(c){
+ const rows=getStandings(c);if(rows.length<2||rows[0].played===0||rows[0].points!==rows[1].points)return false;
+ c.chileTitleTie=chileCreateTie(rows[0].id,rows[1].id,'Desempate pelo título');return true;
+}
+function chileCreatePromotionPlayoff(c){
+ const rows=getStandings(c);if(rows.length<8||rows.slice(0,8).some(r=>r.played===0))return false;
+ c.chilePlayoffs={stage:'quarterfinals',rounds:[{name:'Primeira fase · Liguilla',ties:[
+  chileCreateTie(rows[2].id,rows[7].id,'3º × 8º'),
+  chileCreateTie(rows[3].id,rows[6].id,'4º × 7º'),
+  chileCreateTie(rows[4].id,rows[5].id,'5º × 6º')
+ ]}],awaitingNext:false,completed:false,promoted:null};return true;
+}
+function chilePlayoffStageDone(p){const r=p?.rounds?.[p.rounds.length-1];return !!r&&r.ties.every(t=>!!chileTieWinner(t));}
+function chileCreateNextPromotionStage(c){
+ const p=c.chilePlayoffs;if(!p||!chilePlayoffStageDone(p))return false;
+ const winners=p.rounds[p.rounds.length-1].ties.map(chileTieWinner),rows=getStandings(c);
+ if(p.stage==='quarterfinals'){
+  const entrants=[rows[1].id,...winners].sort((a,b)=>rows.findIndex(r=>r.id===a)-rows.findIndex(r=>r.id===b));
+  p.rounds.push({name:'Semifinais da Liguilla',ties:[chileCreateTie(entrants[0],entrants[3],'Semifinal 1'),chileCreateTie(entrants[1],entrants[2],'Semifinal 2')]});p.stage='semifinals';
+ }else if(p.stage==='semifinals'){
+  const sorted=winners.sort((a,b)=>rows.findIndex(r=>r.id===a)-rows.findIndex(r=>r.id===b));
+  p.rounds.push({name:'Final da Liguilla',ties:[chileCreateTie(sorted[0],sorted[1],'Final')]});p.stage='final';
+ }else if(p.stage==='final'){p.promoted=winners[0];p.completed=true;p.stage='completed';return true;}else return false;
+ p.awaitingNext=false;return true;
+}
+function chileSimulatePromotionStage(c){
+ const p=c.chilePlayoffs;if(!p||p.completed||p.awaitingNext)return;
+ p.rounds[p.rounds.length-1].ties.forEach(chileSimulateTie);
+ if(chilePlayoffStageDone(p))p.awaitingNext=true;
+}
+function chileRenderTie(t){
+ const winner=chileTieWinner(t),a=chileAggregate(t);
+ return '<div class="playoff-tie"><div class="round-title"><strong>'+esc(t.name)+'</strong><span class="tag">'+(winner?'Concluída':'Em disputa')+'</span></div>'+t.legs.map((m,i)=>'<div class="fixture"><span class="fixture-team">'+clubLink(getClub(m.home),getClub(m.home)?.name||'')+'</span><strong class="score">'+(m.homeGoals===null?'—':m.homeGoals+' × '+m.awayGoals)+'</strong><span class="fixture-team away">'+clubLink(getClub(m.away),getClub(m.away)?.name||'')+'</span><small class="leg-label">'+(i?'Jogo de volta':'Jogo de ida')+'</small></div>').join('')+'<div class="aggregate-line">Agregado: <strong>'+a.a+' × '+a.b+'</strong>'+(t.penaltyWinner?' · Decisão nos pênaltis':'')+(winner?' · '+esc(getClub(winner)?.name||''):'')+'</div></div>';
+}
+ensureChile2026();
+
 ensureColombia2026();
 migrateColombiaCompetitions();
 migrateUruguayIntermedioCompetition();
@@ -488,6 +562,12 @@ function countrySeasonBlockers(country,season){
   if(country==='Colômbia'&&c.colombiaDivision==='Primera División'&&!colombiaRelegationDecision(season.year).ready)blockers.push('Primera División: tabela de promedios ainda não pode definir os dois rebaixados.');
   if(country==='Colômbia'&&c.colombiaDivision==='Segunda División'&&!colombiaPromotionStatus(c).complete)blockers.push('Segunda División: os dois acessos à Primera División ainda não foram definidos.');
   if(country==='Colômbia'&&c.colombiaTournaments)Object.entries(c.colombiaTournaments).forEach(([phase,t])=>{if(!t.playoff||t.playoff.stage!=='completed')blockers.push(c.name+' · '+phase+': fase final ainda não foi concluída.');});
+  if(country==='Chile'&&c.chileDivision){
+   const rows=getStandings(c),regularDone=rows.length===16&&rows.every(r=>r.played===30);
+   if(!regularDone){} 
+   if(regularDone&&rows.length>1&&rows[0].points===rows[1].points&&!c.chileTitleTie?.completed)blockers.push(c.name+': desempate pelo título ainda não foi concluído.');
+   if(c.chileDivision==='Primera B'&&regularDone&&(!c.chilePlayoffs?.completed||!c.chilePlayoffs?.promoted))blockers.push('Primera B: liguilla pelo segundo acesso ainda não foi concluída.');
+  }
   const rounds=c.rounds||[];
   const regularDone=rounds.length>0&&rounds.every(r=>r.matches.length>0&&r.matches.every(m=>m.homeGoals!==null&&m.awayGoals!==null));
   if(!regularDone)blockers.push(c.name+': fase regular ainda tem jogos pendentes ou calendário não gerado.');
@@ -568,6 +648,21 @@ function advanceCountrySeason(country,sourceSeasonId){
    nextParticipants.set(second.id,[...second.participants.filter(id=>!promoted.includes(id)),...relegated]);
   }
  }
+ if(country==='Chile'){
+  const first=sourceComps.find(c=>c.chileDivision==='Primera División'),second=sourceComps.find(c=>c.chileDivision==='Primera B');
+  if(first&&second){
+   const firstRows=getStandings(first),secondRows=getStandings(second);
+   const relegated=firstRows.slice(-2).map(r=>r.id),promoted=[secondRows[0]?.id,second.chilePlayoffs?.promoted].filter(Boolean);
+   const secondRelegated=secondRows.slice(-1).map(r=>r.id);
+   if(promoted.length!==2||relegated.length!==2||secondRelegated.length!==1){alert('Não foi possível definir os acessos e rebaixamentos do Chile.');return;}
+   nextParticipants.set(first.id,[...first.participants.filter(id=>!relegated.includes(id)),...promoted]);
+   nextParticipants.set(second.id,[...second.participants.filter(id=>!promoted.includes(id)&&!secondRelegated.includes(id)),...relegated.slice(0,1),...[]]);
+   // A vaga da Primera B é completada pelo clube rebaixado da Primera División que não excede o total de 16.
+   const remainingRelegated=relegated.slice(1);
+   nextParticipants.set(second.id,[...second.participants.filter(id=>!promoted.includes(id)&&!secondRelegated.includes(id)),...relegated]);
+   if(remainingRelegated.length)nextParticipants.set(second.id,[...second.participants.filter(id=>!promoted.includes(id)&&!secondRelegated.includes(id)),...relegated]);
+  }
+ }
  if(country==='Brasil'&&divisions.A&&divisions.B){
   const relegated=getStandings(divisions.A).slice(-4).map(r=>r.id);
   const bStandings=getStandings(divisions.B);
@@ -586,7 +681,7 @@ function advanceCountrySeason(country,sourceSeasonId){
  source.countryAdvancements=source.countryAdvancements||{};
  source.countryAdvancements[country]=nextYear;
  sourceComps.forEach(comp=>{
-  target.competitions.push({...Object.fromEntries(Object.entries(comp).filter(([k])=>!['rounds','playoffs','argentinaPlayoffs','uruguayChampionship','uruguayAccess','uruguayIntermedioFinal','uruguayCompetenciaFinal','colombiaPromotion'].includes(k))),id:uid(),name:comp.name,country,division:comp.division||'',participants:nextParticipants.get(comp.id)||[...comp.participants],...(nextZones.has(comp.id)?{zones:nextZones.get(comp.id)}:{}),...(comp.colombiaTournaments?{colombiaTournaments:{Apertura:{label:'Apertura',rounds:[]},Clausura:{label:'Clausura',rounds:[]}},colombiaActivePhase:'Apertura',colombiaStageView:'first'}:{}),format:comp.format||'A definir'});
+  target.competitions.push({...Object.fromEntries(Object.entries(comp).filter(([k])=>!['rounds','playoffs','argentinaPlayoffs','uruguayChampionship','uruguayAccess','uruguayIntermedioFinal','uruguayCompetenciaFinal','colombiaPromotion','chilePlayoffs','chileTitleTie'].includes(k))),id:uid(),name:comp.name,country,division:comp.division||'',participants:nextParticipants.get(comp.id)||[...comp.participants],...(nextZones.has(comp.id)?{zones:nextZones.get(comp.id)}:{}),...(comp.colombiaTournaments?{colombiaTournaments:{Apertura:{label:'Apertura',rounds:[]},Clausura:{label:'Clausura',rounds:[]}},colombiaActivePhase:'Apertura',colombiaStageView:'first'}:{}),format:comp.format||'A definir'});
  });
  save();renderCompetitions();
  alert(country==='Brasil'&&divisions.A&&divisions.B?'Temporada '+nextYear+' criada! Os quatro últimos da Série A foram rebaixados, e os quatro promovidos da Série B foram definidos. As forças acumuladas dos clubes foram preservadas.':country==='Colômbia'?'Temporada '+nextYear+' criada! Promovidos à Primera División: '+(colombiaPromotionStatus(sourceComps.find(c=>c.colombiaDivision==='Segunda División'))?.promoted||[]).map(id=>getClub(id)?.name||'').join(' e ')+'. Os rebaixados também foram substituídos, e as forças dos clubes foram preservadas.':'Temporada '+nextYear+' criada! Os participantes e as forças acumuladas dos clubes foram preservados.');
@@ -599,6 +694,9 @@ function renderCompetitions(){
   const list=current?current.competitions.filter(c=>(c.country||'Brasil')===country):[];
   const colombiaFirst=list.find(c=>c.colombiaDivision==='Primera División'),colombiaSecond=list.find(c=>c.colombiaDivision==='Segunda División');const primera=list.filter(c=>c.argentinaType==='primera'),uruguayFirst=list.filter(c=>['primera-apertura','intermedio','intermedio-serie','primera-clausura'].includes(c.uruguayType)),uruguaySecond=list.filter(c=>['competencia','competencia-serie','segunda-regular'].includes(c.uruguayType));
   let html='';
+  const chileFirst=list.find(c=>c.chileDivision==='Primera División'),chileSecond=list.find(c=>c.chileDivision==='Primera B');
+  if(chileFirst)html+='<button class="competition-open" data-open-competition="'+current.id+'|'+chileFirst.id+'"><span><strong>Primera División · Chile</strong><small>16 clubes · 30 rodadas</small></span><span class="competition-open-action">Abrir campeonato →</span></button>';
+  if(chileSecond)html+='<button class="competition-open" data-open-competition="'+current.id+'|'+chileSecond.id+'"><span><strong>Primera B · Chile</strong><small>16 clubes · 30 rodadas + liguilla</small></span><span class="competition-open-action">Abrir campeonato →</span></button>';
   if(primera.length)html+='<button class="competition-open" data-open-competition="'+current.id+'|'+primera[0].id+'"><span><strong>Primera División</strong><small>Apertura e Clausura · '+primera[0].participants.length+' participantes</small></span><span class="competition-open-action">Abrir campeonato →</span></button>';
   if(uruguayFirst.length)html+='<button class="competition-open" data-open-competition="'+current.id+'|'+uruguayFirst[0].id+'"><span><strong>Primera División · Uruguai</strong><small>Apertura, Intermedio e Clausura · 16 clubes</small></span><span class="competition-open-action">Abrir campeonato →</span></button>';
   if(uruguaySecond.length)html+='<button class="competition-open" data-open-competition="'+current.id+'|'+uruguaySecond[0].id+'"><span><strong>Segunda División · Uruguai</strong><small>Torneo Competencia e Fase Regular · 14 clubes</small></span><span class="competition-open-action">Abrir campeonato →</span></button>';
@@ -1120,6 +1218,12 @@ function renderCompetitionDetail(seasonId,competitionId,section='table'){
  if(section==='table'){
   const standings=getStandings(competition);
   if(competition.argentinaType){const zones=['A','B'];content='<div class="argentina-rules"><p>'+esc(argentinaCompetitionDescription(competition))+'</p></div><div class="table-legend">'+(competition.argentinaType==='primera'?'<span class="legend-item playoff">Playoffs · 1º ao 8º de cada zona</span>':'<span class="legend-item access">Final pelo acesso · 1º de cada zona</span><span class="legend-item playoff">Reducido · 2º ao 8º</span>')+'</div>'+zones.map(z=>'<h3 class="season-heading">Zona '+z+'</h3><div class="table-wrap"><table class="standings"><thead><tr><th>#</th><th>Clube</th><th>P</th><th>J</th><th>V</th><th>E</th><th>D</th><th>GP</th><th>GC</th><th>SG</th></tr></thead><tbody>'+argentinaZoneStandings(competition,z).map((r,i)=>{const rank=i+1;const rowClass=competition.argentinaType==='primera'?(rank<=8?'zone-playoff':''):rank===1?'zone-access':rank<=8?'zone-playoff':'';return '<tr class="'+rowClass+'"><td>'+rank+'</td><td class="team-name">'+clubLink(r.club,r.club.name)+'</td><td>'+r.points+'</td><td>'+r.played+'</td><td>'+r.wins+'</td><td>'+r.draws+'</td><td>'+r.losses+'</td><td>'+r.gf+'</td><td>'+r.ga+'</td><td>'+(r.gf-r.ga)+'</td></tr>';}).join('')+'</tbody></table></div>').join('');if(competition.argentinaType==='primera'&&competition.phase==='Apertura'){const promedio=argentinaPromediosTable(season.year),period=promedio.years.length+' temporada(s): '+promedio.years.join(', ');content+='<h3 class="season-heading">Tabela de promedios</h3><p class="muted">Média calculada pelos pontos divididos pelos jogos disputados nas '+esc(period)+'. A janela cresce de 1 para 2 e depois 3 temporadas; a partir daí, considera sempre as 3 mais recentes. Somente partidas simuladas na Primera División entram no cálculo.</p><div class="table-wrap"><table class="standings"><thead><tr><th>#</th><th>Clube</th><th>Pontos</th><th>Jogos</th><th>Promedio</th></tr></thead><tbody>'+promedio.rows.map((r,i)=>'<tr><td>'+(i+1)+'</td><td class="team-name">'+clubLink(getClub(r.id),getClub(r.id)?.name||'Clube')+'</td><td>'+r.points+'</td><td>'+r.played+'</td><td>'+(r.average===null?'—':r.average.toFixed(3))+'</td></tr>').join('')+'</tbody></table></div>';const anual=argentinaAnnualTable(season.year),decision=argentinaRelegationDecision(season.year);content+='<h3 class="season-heading">Tabela anual acumulada</h3><p class="muted">Soma dos pontos do Apertura e do Clausura. A última posição define um dos rebaixamentos, exceto quando coincide com o último dos promedios.</p><div class="table-wrap"><table class="standings"><thead><tr><th>#</th><th>Clube</th><th>Pontos</th><th>Jogos</th><th>SG</th></tr></thead><tbody>'+anual.map((r,i)=>'<tr class="'+(decision.ready&&decision.relegated.includes(r.id)?'zone-relegation':'')+'"><td>'+(i+1)+'</td><td class="team-name">'+clubLink(getClub(r.id),getClub(r.id)?.name||'Clube')+'</td><td>'+r.points+'</td><td>'+r.played+'</td><td>'+(r.gf-r.ga)+'</td></tr>').join('')+'</tbody></table></div><div class="table-legend"><span class="legend-item relegation">Rebaixados · 2 clubes (promedios + tabela anual)</span></div><h3 class="season-heading">Rebaixamento previsto</h3><p class="muted">'+(decision.ready?'Promedios: '+esc(getClub(decision.promedios)?.name||'')+' ('+decision.average.toFixed(3)+'). Tabela anual: '+esc(getClub(decision.annual)?.name||'')+'. Os dois clubes serão rebaixados ao encerrar a temporada.':'Ainda não definido: '+esc(decision.reason))+'</p>';}}
+  else if(competition.chileDivision){
+   const first=competition.chileDivision==='Primera División',p=competition.chilePlayoffs,rows=standings;
+   content='<div class="argentina-rules"><p>Chile 2026: 16 clubes, 30 rodadas em turno e returno. '+(first?'Os dois últimos são rebaixados.':'O campeão sobe diretamente; do 2º ao 8º disputam a liguilla pelo segundo acesso, e o último é rebaixado.')+'</p></div><div class="table-legend">'+(first?'<span class="legend-item relegation">Rebaixamento · 2 últimos</span>':'<span class="legend-item access">Acesso direto · 1º</span><span class="legend-item playoff">Liguilla · 2º ao 8º</span><span class="legend-item relegation">Rebaixamento · último</span>')+'</div><div class="table-wrap"><table class="standings"><thead><tr><th>#</th><th>Clube</th><th>P</th><th>J</th><th>V</th><th>E</th><th>D</th><th>GP</th><th>GC</th><th>SG</th></tr></thead><tbody>'+rows.map((r,i)=>{const rank=i+1,cls=first?(rank>=15?'zone-relegation':''):(rank===1?'zone-access':rank<=8?'zone-playoff':rank===16?'zone-relegation':'');return '<tr class="'+cls+'"><td>'+rank+'</td><td class="team-name">'+clubLink(r.club,r.club.name)+'</td><td>'+r.points+'</td><td>'+r.played+'</td><td>'+r.wins+'</td><td>'+r.draws+'</td><td>'+r.losses+'</td><td>'+r.gf+'</td><td>'+r.ga+'</td><td>'+(r.gf-r.ga)+'</td></tr>';}).join('')+'</tbody></table></div>';
+   if(rows.length>1&&rows[0].played===30&&rows[0].points===rows[1].points)content+='<h3 class="season-heading">Desempate pelo título</h3><p class="muted">'+(competition.chileTitleTie?.completed?'Campeão: '+esc(getClub(chileTieWinner(competition.chileTitleTie))?.name||''):'Os dois primeiros terminaram empatados em pontos. Gere o jogo de desempate na aba Jogos.')+'</p>';
+   if(!first&&p?.completed)content+='<p class="access-confirmation">Segundo promovido: '+esc(getClub(p.promoted)?.name||'')+'</p>';
+  }
   else if(competition.colombiaDivision){
    const phase=competition.colombiaActivePhase||'Apertura',annual=colombiaAnnualTable(season.year,competition.colombiaDivision),stageView=competition.colombiaStageView||'first',p=competition.colombiaTournaments[phase]?.playoff,isFirst=competition.colombiaDivision==='Primera División';
    const tableHtml=rows=>'<div class="table-wrap"><table class="standings"><thead><tr><th>#</th><th>Clube</th><th>P</th><th>J</th><th>V</th><th>E</th><th>D</th><th>GP</th><th>GC</th><th>SG</th></tr></thead><tbody>'+rows.map((r,i)=>'<tr><td>'+(i+1)+'</td><td class="team-name">'+clubLink(r.club,r.club.name)+'</td><td>'+r.points+'</td><td>'+r.played+'</td><td>'+r.wins+'</td><td>'+r.draws+'</td><td>'+r.losses+'</td><td>'+r.gf+'</td><td>'+r.ga+'</td><td>'+(r.gf-r.ga)+'</td></tr>').join('')+'</tbody></table></div>';
@@ -1153,6 +1257,18 @@ function renderCompetitionDetail(seasonId,competitionId,section='table'){
   else content='<div class="table-legend">'+(competition.division==='A'?'<span class="legend-item relegation">Rebaixamento · 17º ao 20º</span>':'<span class="legend-item access">Acesso direto · 1º e 2º</span><span class="legend-item playoff">Playoffs · 3º ao 6º</span>')+'</div><div class="table-wrap"><table class="standings"><thead><tr><th>#</th><th>Clube</th><th>P</th><th>J</th><th>V</th><th>E</th><th>D</th><th>GP</th><th>GC</th><th>SG</th></tr></thead><tbody>'+standings.map((r,i)=>{const rank=i+1,winner=competition.playoffs?.ties?.some(t=>playoffWinner(t)===r.id);const zone=competition.division==='A'?(rank>=17?'zone-relegation':''):(rank<=2||winner?'zone-access':rank<=6?'zone-playoff':'');return '<tr class="'+zone+'"><td>'+rank+'</td><td class="team-name">'+clubLink(r.club,r.club.name)+'</td><td>'+r.points+'</td><td>'+r.played+'</td><td>'+r.wins+'</td><td>'+r.draws+'</td><td>'+r.losses+'</td><td>'+r.gf+'</td><td>'+r.ga+'</td><td>'+(r.gf-r.ga)+'</td></tr>';}).join('')+'</tbody></table></div>'+(competition.division==='B'&&competition.playoffs?'<p class="muted">Os vencedores do mata-mata aparecem em verde: acesso garantido.</p>':'');
  }else if(section==='games'){
   const colombiaSecondView=!!competition.colombiaDivision&&(competition.colombiaStageView||'first')==='second';const rounds=competition.colombiaDivision?(colombiaSecondView?[]:(competition.rounds||[])):(competition.rounds||[]);
+  if(competition.chileDivision&&regularDone){
+   const rows=getStandings(competition),first=competition.chileDivision==='Primera División';
+   if(rows.length>1&&rows[0].points===rows[1].points){
+    if(!competition.chileTitleTie)content+='<div class="playoff-panel"><h3>Desempate pelo título</h3><p class="muted">Os dois primeiros terminaram empatados em pontos. Gere o jogo único de desempate.</p><button class="btn" id="create-chile-title-tie">Gerar confronto</button></div>';
+    else {const t=competition.chileTitleTie,m=t.legs[0],winner=chileTieWinner(t);content+='<div class="playoff-panel"><h3>Desempate pelo título</h3>'+ '<div class="fixture"><span class="fixture-team">'+clubLink(getClub(m.home),getClub(m.home)?.name||'')+'</span><strong class="score">'+(m.homeGoals===null?'—':m.homeGoals+' × '+m.awayGoals)+'</strong><span class="fixture-team away">'+clubLink(getClub(m.away),getClub(m.away)?.name||'')+'</span></div>'+(winner?'<p class="access-confirmation">Campeão: '+esc(getClub(winner)?.name||'')+'</p>':'<button class="btn" id="simulate-chile-title-tie">Simular desempate</button>')+'</div>';}
+   }
+   if(!first){
+    const p=competition.chilePlayoffs;
+    if(!p)content+='<div class="playoff-panel"><h3>Liguilla pelo segundo acesso</h3><p class="muted">Quartas preliminares: 3º × 8º, 4º × 7º e 5º × 6º. O 2º colocado entra diretamente nas semifinais. Todas as fases são disputadas em ida e volta.</p><button class="btn" id="create-chile-playoffs">Gerar confrontos da liguilla</button></div>';
+    else {const current=p.rounds[p.rounds.length-1];content+='<div class="playoff-panel"><h3>Liguilla pelo segundo acesso</h3><p class="muted">'+esc(current.name)+'</p>'+current.ties.map(chileRenderTie).join('')+(p.completed?'<p class="access-confirmation">Segundo acesso: '+esc(getClub(p.promoted)?.name||'')+'</p>':p.awaitingNext?'<button class="btn" id="next-chile-playoffs">Gerar próxima fase</button>':'<button class="btn" id="simulate-chile-playoffs">Simular '+(current.ties.some(t=>t.legs[0].homeGoals===null)?'jogos de ida':'jogos de volta')+'</button>')+'</div>';}
+   }
+  }
   if(competition.argentinaType)content='<div class="argentina-rules"><p>'+esc(argentinaCompetitionDescription(competition))+'</p></div>';
   content+=rounds.length?'<div class="round-actions"><span class="muted">Rodadas: '+rounds.length+' · Jogos concluídos: '+rounds.reduce((n,r)=>n+r.matches.filter(m=>m.homeGoals!==null).length,0)+'</span><div class="round-controls"><label for="simulate-count">Simular próximas</label><select id="simulate-count">'+[1,2,3,4,5].map(n=>'<option value="'+n+'" '+(n===5?'selected':'')+'>'+n+' rodada(s)</option>').join('')+'</select><button class="btn" id="simulate-rounds">Simular resultados</button></div></div>'+rounds.map(r=>'<div class="round-card"><div class="round-title"><strong>Rodada '+r.number+'</strong><span class="tag">'+(r.matches.every(m=>m.homeGoals!==null)?'Concluída':'Pendente')+'</span></div>'+r.matches.map(m=>'<div class="fixture"><span class="fixture-team">'+clubLink(getClub(m.home),getClub(m.home).name)+'</span><strong class="score">'+(m.homeGoals===null?'—':m.homeGoals+' × '+m.awayGoals)+'</strong><span class="fixture-team away">'+clubLink(getClub(m.away),getClub(m.away).name)+'</span></div>').join('')+'</div>').join('') :'<div class="empty">Inscreva pelo menos dois clubes para gerar as rodadas automaticamente.</div>';
   const regularDone=rounds.length>0&&rounds.every(r=>r.matches.every(m=>m.homeGoals!==null&&m.awayGoals!==null));
@@ -1225,6 +1341,11 @@ function renderCompetitionDetail(seasonId,competitionId,section='table'){
  if(createPlayoffs)createPlayoffs.addEventListener('click',()=>{if(createAccessPlayoffs(competition)){save();renderCompetitionDetail(seasonId,competitionId,'games');}});
  const playoffSim=document.querySelector('#simulate-playoff-leg');
  if(playoffSim)playoffSim.addEventListener('click',()=>{simulateNextPlayoffLeg(competition);save();renderCompetitionDetail(seasonId,competitionId,'games');});
+ const createChileTitleTie=document.querySelector('#create-chile-title-tie');if(createChileTitleTie)createChileTitleTie.addEventListener('click',()=>{if(chileCreateTitleTie(competition)){save();renderCompetitionDetail(seasonId,competitionId,'games');}});
+ const simulateChileTitleTie=document.querySelector('#simulate-chile-title-tie');if(simulateChileTitleTie)simulateChileTitleTie.addEventListener('click',()=>{chileSimulateTie(competition.chileTitleTie);save();renderCompetitionDetail(seasonId,competitionId,'games');});
+ const createChilePlayoffs=document.querySelector('#create-chile-playoffs');if(createChilePlayoffs)createChilePlayoffs.addEventListener('click',()=>{if(!chileCreatePromotionPlayoff(competition)){alert('Não foi possível gerar a liguilla. Confira a classificação e os jogos.');return;}save();renderCompetitionDetail(seasonId,competitionId,'games');});
+ const simulateChilePlayoffs=document.querySelector('#simulate-chile-playoffs');if(simulateChilePlayoffs)simulateChilePlayoffs.addEventListener('click',()=>{chileSimulatePromotionStage(competition);save();renderCompetitionDetail(seasonId,competitionId,'games');});
+ const nextChilePlayoffs=document.querySelector('#next-chile-playoffs');if(nextChilePlayoffs)nextChilePlayoffs.addEventListener('click',()=>{if(!chileCreateNextPromotionStage(competition)){alert('Não foi possível gerar a próxima fase.');return;}save();renderCompetitionDetail(seasonId,competitionId,'games');});
  const createColombiaPlayoffs=document.querySelector('#create-colombia-playoffs');if(createColombiaPlayoffs)createColombiaPlayoffs.addEventListener('click',()=>{if(!colombiaCreatePlayoffs(competition)){alert('Não foi possível gerar a fase final. Confira se a fase regular está completa.');return;}save();renderCompetitionDetail(seasonId,competitionId,'games');});
  const simulateColombiaPlayoff=document.querySelector('#simulate-colombia-playoff');if(simulateColombiaPlayoff)simulateColombiaPlayoff.addEventListener('click',()=>{colombiaSimulatePlayoff(competition);save();renderCompetitionDetail(seasonId,competitionId,'games');});
  const nextColombiaPlayoff=document.querySelector('#next-colombia-playoff');if(nextColombiaPlayoff)nextColombiaPlayoff.addEventListener('click',()=>{if(!colombiaCreateNextPlayoffStage(competition)){alert('Não foi possível gerar a próxima fase.');return;}save();renderCompetitionDetail(seasonId,competitionId,'games');});
