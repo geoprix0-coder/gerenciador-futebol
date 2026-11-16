@@ -438,11 +438,28 @@ function argentinaAdvancePrimeraRound(competition){
  return true;
 }
 function argentinaNacionalCreatePlayoffs(competition){
- const a=argentinaZoneStandings(competition,'A'),b=argentinaZoneStandings(competition,'B');
- if(a.length<8||b.length<8||a.some(r=>r.played===0)||b.some(r=>r.played===0))return false;
- const final=argentinaCreateSingleTie(a[0].id,b[0].id,'Final pelo primeiro acesso');
- competition.argentinaPlayoffs={kind:'nacional',stage:'final',final,rounds:[],completed:false,promotedDirect:null,promotedReduced:null};
+ const zonaA=argentinaZoneStandings(competition,'A');
+ const zonaB=argentinaZoneStandings(competition,'B');
+ if(zonaA.length<8||zonaB.length<8||zonaA.some(r=>r.played===0)||zonaB.some(r=>r.played===0))return false;
+ // A final é obrigatoriamente entre o líder da Zona A e o líder da Zona B.
+ const primeiroZonaA=zonaA[0].id;
+ const primeiroZonaB=zonaB[0].id;
+ const final=argentinaCreateSingleTie(primeiroZonaA,primeiroZonaB,'1º da Zona A × 1º da Zona B · Final pelo primeiro acesso');
+ competition.argentinaPlayoffs={kind:'nacional',stage:'final',final,finalParticipants:{zonaA:primeiroZonaA,zonaB:primeiroZonaB},rounds:[],completed:false,promotedDirect:null,promotedReduced:null};
  return true;
+}
+function argentinaEnsureNacionalFinal(competition){
+ const p=competition.argentinaPlayoffs;
+ if(!p||p.kind!=='nacional'||p.stage!=='final'||!p.final)return;
+ const zonaA=argentinaZoneStandings(competition,'A'),zonaB=argentinaZoneStandings(competition,'B');
+ if(!zonaA.length||!zonaB.length)return;
+ const primeiroZonaA=zonaA[0].id,primeiroZonaB=zonaB[0].id;
+ const m=p.final.match;
+ // Corrige confrontos antigos ainda não disputados sem tocar em resultados já simulados.
+ if(m&&m.homeGoals===null&&m.awayGoals===null&&(p.final.home!==primeiroZonaA||p.final.away!==primeiroZonaB)){
+  p.final=argentinaCreateSingleTie(primeiroZonaA,primeiroZonaB,'1º da Zona A × 1º da Zona B · Final pelo primeiro acesso');
+  p.finalParticipants={zonaA:primeiroZonaA,zonaB:primeiroZonaB};
+ }
 }
 function argentinaBuildReducido(competition){
  const p=competition.argentinaPlayoffs;if(!p||!p.final||!argentinaMatchWinner(p.final))return false;
