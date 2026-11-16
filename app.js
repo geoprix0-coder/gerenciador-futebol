@@ -78,10 +78,120 @@ if(!data||!Array.isArray(data.clubs)||!Array.isArray(data.seasons)||!data.season
  seasons=data.seasons;
 }
 const view=document.querySelector('#view'),title=document.querySelector('#page-title');
-const labels={inicio:'Painel inicial',competicoes:'Competições',clubes:'Clubes',temporadas:'Temporadas',partidas:'Partidas',classificacao:'Classificação',historico:'Histórico'};
+const labels={inicio:'Painel inicial',competicoes:'Competições',clubes:'Clubes',selecoes:'Seleções',temporadas:'Temporadas',partidas:'Partidas',classificacao:'Classificação',historico:'Histórico'};
 const CONTINENTS=['América do Norte','América do Sul','Europa','Ásia','África','Oceania'];
 const COUNTRY_CONTINENT=Object.fromEntries(['Brasil','Argentina','Uruguai','Colômbia','Chile','Paraguai','Equador','Peru','Venezuela','Bolívia','Guiana','Suriname'].map(country=>[slugify(country),'América do Sul']));
 let activeCompetitionContinent=null;
+
+const SELECTIONS_STORE='wfs-selections-ranking-v1';
+const SELECTION_MATCHES_STORE='wfs-selections-matches-v1';
+const CONFEDERATION_NAMES={UEFA:'Europa · UEFA',CAF:'África · CAF',AFC:'Ásia · AFC',CONCACAF:'América do Norte, Central e Caribe · CONCACAF',CONMEBOL:'América do Sul · CONMEBOL',OFC:'Oceania · OFC'};
+const MATCH_IMPORTANCE=[
+ {id:'friendly_outside',label:'Amistoso fora da Data FIFA',weight:5},
+ {id:'friendly_inside',label:'Amistoso na Data FIFA',weight:10},
+ {id:'nations_group',label:'Liga das Nações · fase de grupos',weight:15},
+ {id:'nations_final',label:'Liga das Nações · finais/playoffs',weight:25},
+ {id:'qualifiers',label:'Eliminatórias continentais ou da Copa do Mundo',weight:25},
+ {id:'continental_group',label:'Torneio continental · até as quartas',weight:35},
+ {id:'continental_qf',label:'Torneio continental · quartas em diante',weight:40},
+ {id:'worldcup_group',label:'Copa do Mundo · grupos/oitavas',weight:50},
+ {id:'worldcup_qf',label:'Copa do Mundo · quartas em diante',weight:60}
+];
+const INTERNATIONAL_COMPETITIONS=[
+ {name:'Copa do Mundo FIFA',confederation:'FIFA',type:'Torneio mundial',detail:'Fase final mundial e eliminatórias classificatórias'},
+ {name:'Eliminatórias da Copa do Mundo',confederation:'FIFA',type:'Qualificatórias',detail:'Disputadas em cada confederação'},
+ {name:'Eurocopa',confederation:'UEFA',type:'Torneio continental',detail:'Seleções europeias'},
+ {name:'Copa América',confederation:'CONMEBOL',type:'Torneio continental',detail:'Seleções sul-americanas'},
+ {name:'Copa Africana de Nações',confederation:'CAF',type:'Torneio continental',detail:'Seleções africanas'},
+ {name:'Copa Asiática',confederation:'AFC',type:'Torneio continental',detail:'Seleções asiáticas'},
+ {name:'Copa Ouro',confederation:'CONCACAF',type:'Torneio continental',detail:'Seleções da América do Norte, Central e Caribe'},
+ {name:'Copa das Nações da OFC',confederation:'OFC',type:'Torneio continental',detail:'Seleções da Oceania'},
+ {name:'Liga das Nações da UEFA',confederation:'UEFA',type:'Liga das Nações',detail:'Fase de grupos e fases finais'},
+ {name:'Liga das Nações da CONCACAF',confederation:'CONCACAF',type:'Liga das Nações',detail:'Fase de grupos e fases finais'},
+ {name:'Amistosos internacionais',confederation:'FIFA',type:'Amistosos',detail:'Partidas oficiais entre seleções'}
+];
+let nationalTeams=JSON.parse(localStorage.getItem(SELECTIONS_STORE)||'null');
+if(!Array.isArray(nationalTeams)||nationalTeams.length!==211){
+ nationalTeams=(window.WFS_SELECTIONS||[]).map(t=>({...t,points:1000,history:[],matches:0}));
+ localStorage.setItem(SELECTIONS_STORE,JSON.stringify(nationalTeams));
+}
+let internationalMatches=JSON.parse(localStorage.getItem(SELECTION_MATCHES_STORE)||'[]');
+let activeSelectionTab='ranking',activeSelectionConfederation='Todas';
+function saveSelections(){localStorage.setItem(SELECTIONS_STORE,JSON.stringify(nationalTeams));localStorage.setItem(SELECTION_MATCHES_STORE,JSON.stringify(internationalMatches));}
+function getNationalTeam(id){return nationalTeams.find(t=>t.id===id);}
+function flagEmoji(iso){
+ if(!iso||iso.length!==2)return '🏳️';
+ return String.fromCodePoint(...iso.toUpperCase().split('').map(c=>127397+c.charCodeAt(0)));
+}
+function rankedSelections(list=nationalTeams){
+ const sorted=[...list].sort((a,b)=>b.points-a.points||a.name.localeCompare(b.name,'pt-BR'));
+ let last=null,rank=0;
+ return sorted.map((team,index)=>{if(last===null||Math.abs(team.points-last)>0.000001)rank=index+1;last=team.points;return {...team,rank};});
+}
+function selectionMatchExpected(home,away){return 1/(1+Math.pow(10,-((home.points-away.points)/600)));}
+function recordInternationalMatch(form){
+ const home=getNationalTeam(form.home.value),away=getNationalTeam(form.away.value);
+ const homeGoals=Number(form.homeGoals.value),awayGoals=Number(form.awayGoals.value);
+ const type=MATCH_IMPORTANCE.find(x=>x.id===form.matchType.value);
+ if(!home||!away||home.id===away.id||!Number.isInteger(homeGoals)||!Number.isInteger(awayGoals)||homeGoals<0||awayGoals<0||!type){alert('Confira as seleções, o placar e a importância da partida.');return false;}
+ let homeOutcome=homeGoals>awayGoals?1:homeGoals<awayGoals?0:0.5;
+ let penaltyWinner=null;
+ if(homeGoals===awayGoals){
+  const winner=form.penaltyWinner.value;
+  if(winner!=='home'&&winner!=='away'){alert('Em caso de empate com disputa por pênaltis, selecione a seleção vencedora.');return false;}
+  homeOutcome=winner==='home'?0.75:0.5;
+  penaltyWinner=winner==='home'?home.id:away.id;
+ }
+ const expectedHome=selectionMatchExpected(home,away),expectedAway=1-expectedHome;
+ const deltaHome=type.weight*(homeOutcome-expectedHome);
+ const awayOutcome=homeGoals===awayGoals?(penaltyWinner?(penaltyWinner===away.id?0.75:0.5):0.5):(1-homeOutcome);
+ const deltaAway=type.weight*(awayOutcome-expectedAway);
+ const beforeHome=home.points,beforeAway=away.points;
+ home.points=Number((home.points+deltaHome).toFixed(2));away.points=Number((away.points+deltaAway).toFixed(2));
+ home.matches=(home.matches||0)+1;away.matches=(away.matches||0)+1;
+ const date=form.matchDate.value||new Date().toISOString().slice(0,10);
+ const match={id:uid(),date,home:home.id,away:away.id,homeGoals,awayGoals,type:type.id,typeLabel:type.label,weight:type.weight,penaltyWinner,homeBefore:beforeHome,awayBefore:beforeAway,homeDelta:Number(deltaHome.toFixed(2)),awayDelta:Number(deltaAway.toFixed(2)),homeAfter:home.points,awayAfter:away.points};
+ internationalMatches.unshift(match);
+ home.history=home.history||[];away.history=away.history||[];
+ home.history.unshift({date,opponent:away.id,score:homeGoals+'–'+awayGoals,delta:match.homeDelta,points:home.points});
+ away.history.unshift({date,opponent:home.id,score:awayGoals+'–'+homeGoals,delta:match.awayDelta,points:away.points});
+ saveSelections();return true;
+}
+function selectionTabsHtml(){
+ return '<div class="selection-tabs">'+[['ranking','Ranking mundial'],['teams','Seleções'],['matches','Partidas e pontuação'],['competitions','Competições']].map(([id,label])=>'<button class="selection-tab '+(activeSelectionTab===id?'active':'')+'" data-selection-tab="'+id+'">'+label+'</button>').join('')+'</div>';
+}
+function renderSelections(tab=activeSelectionTab){
+ activeSelectionTab=tab;title.textContent='Seleções nacionais';
+ const total=nationalTeams.length,ranked=rankedSelections();
+ let content='<div class="selection-hero"><div><span class="eyebrow">WFS · FUTEBOL INTERNACIONAL MASCULINO</span><h2>Ranking mundial de seleções</h2><p>211 associações filiadas à FIFA · seis confederações · pontuação inicial padronizada</p></div><div class="selection-total"><strong>'+total+'</strong><span>seleções</span></div></div>'+selectionTabsHtml();
+ if(tab==='ranking'){
+  const list=activeSelectionConfederation==='Todas'?ranked:ranked.filter(t=>t.confederation===activeSelectionConfederation);
+  content+='<div class="panel"><div class="panel-head"><div><h3>Classificação mundial</h3><p class="muted">Todas as seleções começaram com 1.000 pontos. Empates de pontuação compartilham a mesma posição.</p></div><select id="selection-confederation"><option>Todas</option>'+Object.keys(CONFEDERATION_NAMES).map(c=>'<option value="'+c+'" '+(activeSelectionConfederation===c?'selected':'')+'>'+CONFEDERATION_NAMES[c]+'</option>').join('')+'</select></div>'+selectionRankingTable(list)+'</div>';
+ }else if(tab==='teams'){
+  content+='<div class="panel"><div class="panel-head"><div><h3>Diretório de seleções</h3><p class="muted">Cadastro das 211 associações, com bandeira, sigla e confederação.</p></div><input id="selection-search" placeholder="Buscar seleção..." aria-label="Buscar seleção"></div><div class="selection-confed-filter">'+['Todas',...Object.keys(CONFEDERATION_NAMES)].map(c=>'<button class="filter-chip '+(activeSelectionConfederation===c?'active':'')+'" data-team-confed="'+c+'">'+(c==='Todas'?'Todas':c)+'</button>').join('')+'</div><div id="selection-team-table">'+selectionTeamTable(nationalTeams)+'</div></div>';
+ }else if(tab==='matches'){
+  const teamOptions=nationalTeams.slice().sort((a,b)=>a.name.localeCompare(b.name,'pt-BR')).map(t=>'<option value="'+t.id+'">'+flagEmoji(t.iso)+' '+esc(t.name)+'</option>').join('');
+  content+='<div class="panel"><h3>Registrar resultado internacional</h3><p class="muted">O resultado atualiza imediatamente os pontos das duas seleções pelo modelo SUM inspirado no ranking FIFA.</p><form id="international-match-form"><div class="selection-match-grid"><div class="field"><label>Seleção mandante</label><select name="home" required>'+teamOptions+'</select></div><div class="field"><label>Seleção visitante</label><select name="away" required>'+teamOptions+'</select></div><div class="field"><label>Gols · mandante</label><input name="homeGoals" type="number" min="0" max="30" value="1" required></div><div class="field"><label>Gols · visitante</label><input name="awayGoals" type="number" min="0" max="30" value="0" required></div><div class="field"><label>Importância da partida</label><select name="matchType">'+MATCH_IMPORTANCE.map(t=>'<option value="'+t.id+'">'+t.label+' · peso '+t.weight+'</option>').join('')+'</select></div><div class="field"><label>Data</label><input name="matchDate" type="date" value="'+new Date().toISOString().slice(0,10)+'" required></div><div class="field penalty-field"><label>Vencedora nos pênaltis (se houver empate)</label><select name="penaltyWinner"><option value="">Não houve disputa</option><option value="home">Seleção mandante</option><option value="away">Seleção visitante</option></select></div></div><button class="btn" type="submit">Registrar partida e atualizar ranking</button></form></div>';
+  content+='<div class="panel"><div class="panel-head"><h3>Histórico de partidas</h3><span class="tag">'+internationalMatches.length+' REGISTRADAS</span></div>'+(internationalMatches.length?'<div class="table-wrap"><table class="standings selection-match-table"><thead><tr><th>Data</th><th>Partida</th><th>Placar</th><th>Peso</th><th>Variação</th></tr></thead><tbody>'+internationalMatches.map(m=>{const h=getNationalTeam(m.home),a=getNationalTeam(m.away);return '<tr><td>'+esc(m.date)+'</td><td class="team-name">'+flagEmoji(h?.iso)+' '+esc(h?.name||'')+' × '+flagEmoji(a?.iso)+' '+esc(a?.name||'')+'</td><td>'+m.homeGoals+'–'+m.awayGoals+(m.penaltyWinner?' (pên.)':'')+'</td><td>'+m.weight+'</td><td><span class="points-up">+'+m.homeDelta+'</span> / <span class="points-down">'+m.awayDelta+'</span></td></tr>';}).join('')+'</tbody></table></div>':'<div class="empty">Nenhuma partida internacional registrada.</div>')+'</div>';
+ }else{
+  content+='<div class="panel"><h3>Competições internacionais previstas</h3><p class="muted">Catálogo inicial de competições para as seleções masculinas. O peso aplicado ao ranking depende da fase e do tipo exato da partida.</p>'+INTERNATIONAL_COMPETITIONS.map(c=>'<div class="competition-row"><div><strong>'+esc(c.name)+'</strong><small>'+esc(c.detail)+'</small></div><span class="tag">'+esc(c.confederation)+'</span></div>').join('')+'</div>';
+  content+='<div class="panel"><h3>Pesos das partidas no ranking</h3><div class="table-wrap"><table class="standings"><thead><tr><th>Tipo de partida</th><th>Peso</th></tr></thead><tbody>'+MATCH_IMPORTANCE.map(t=>'<tr><td class="team-name">'+esc(t.label)+'</td><td>'+t.weight+'</td></tr>').join('')+'</tbody></table></div></div>';
+ }
+ view.innerHTML=content;
+ view.querySelectorAll('[data-selection-tab]').forEach(b=>b.addEventListener('click',()=>{activeSelectionConfederation='Todas';renderSelections(b.dataset.selectionTab);}));
+ const confed=document.querySelector('#selection-confederation');if(confed)confed.addEventListener('change',()=>{activeSelectionConfederation=confed.value;renderSelections('ranking');});
+ view.querySelectorAll('[data-team-confed]').forEach(b=>b.addEventListener('click',()=>{activeSelectionConfederation=b.dataset.teamConfed;renderSelections('teams');}));
+ const search=document.querySelector('#selection-search');if(search)search.addEventListener('input',()=>{const q=search.value.toLocaleLowerCase('pt-BR');const list=nationalTeams.filter(t=>(activeSelectionConfederation==='Todas'||t.confederation===activeSelectionConfederation)&&(t.name.toLocaleLowerCase('pt-BR').includes(q)||t.fifaName.toLowerCase().includes(q)));document.querySelector('#selection-team-table').innerHTML=selectionTeamTable(list);});
+ const matchForm=document.querySelector('#international-match-form');if(matchForm)matchForm.addEventListener('submit',e=>{e.preventDefault();if(recordInternationalMatch(matchForm)){alert('Partida registrada. O ranking mundial e o ranking continental foram atualizados.');renderSelections('ranking');}});
+}
+function selectionRankingTable(list){
+ return '<div class="table-wrap"><table class="standings selection-ranking"><thead><tr><th>POS.</th><th>SELEÇÃO</th><th>CONFEDERAÇÃO</th><th>PONTOS</th><th>JOGOS</th></tr></thead><tbody>'+list.map(t=>'<tr><td>'+t.rank+'º</td><td class="team-name">'+flagEmoji(t.iso)+' '+esc(t.name)+'</td><td>'+t.confederation+'</td><td><strong>'+Number(t.points).toFixed(2).replace(/\.00$/,'')+'</strong></td><td>'+Number(t.matches||0)+'</td></tr>').join('')+'</tbody></table></div>';
+}
+function selectionTeamTable(list){
+ const sorted=[...list].sort((a,b)=>a.name.localeCompare(b.name,'pt-BR'));
+ return '<div class="table-wrap"><table class="standings selection-ranking"><thead><tr><th>SELEÇÃO</th><th>SIGLA</th><th>CONFEDERAÇÃO</th><th>PONTOS</th></tr></thead><tbody>'+sorted.map(t=>'<tr><td class="team-name">'+flagEmoji(t.iso)+' '+esc(t.name)+'</td><td>'+t.iso+'</td><td>'+t.confederation+'</td><td>'+Number(t.points).toFixed(2).replace(/\.00$/,'')+'</td></tr>').join('')+'</tbody></table></div>';
+}
+
 function save(){seasons.forEach(s=>s.competitions.forEach(c=>{if(c.colombiaTournaments&&c.colombiaActivePhase)c.colombiaTournaments[c.colombiaActivePhase].rounds=c.rounds||[];if(c.ecuadorDivision&&c.ecuadorStage==='final'&&c.rounds?.length)c.ecuadorFinalRounds=JSON.parse(JSON.stringify(c.rounds));if(c.ecuadorDivision&&c.ecuadorStage==='regular'&&c.rounds?.length)c.ecuadorRegularRounds=JSON.parse(JSON.stringify(c.rounds));if(c.venezuelaDivision==='Primera División'&&c.rounds?.length){if(c.venezuelaStage==='regular')c.venezuelaRegularRounds=JSON.parse(JSON.stringify(c.rounds));if(c.venezuelaStage==='quadrangular')c.venezuelaFinalRounds=JSON.parse(JSON.stringify(c.rounds));}if(c.venezuelaDivision==='Segunda División'&&c.venezuelaStage==='regional'&&c.rounds?.length)c.venezuelaRegionalRounds=JSON.parse(JSON.stringify(c.rounds));if(c.boliviaDivision&&c.boliviaStage==='groups'&&c.rounds?.length)c.boliviaGroupRounds=JSON.parse(JSON.stringify(c.rounds));if(c.libertadoresCompetition&&c.libertadoresStage==='groups'&&c.rounds?.length)c.libertadoresGroupRounds=JSON.parse(JSON.stringify(c.rounds));if(c.sudamericanaCompetition&&c.sudamericanaStage==='groups'&&c.rounds?.length)c.sudamericanaGroupRounds=JSON.parse(JSON.stringify(c.rounds));}));data={clubs,seasons};localStorage.setItem(STORE,JSON.stringify(data));}
 function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
 function getClub(id){return clubs.find(c=>c.id===id);}
