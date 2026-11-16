@@ -273,6 +273,8 @@ function advanceCountrySeason(country,sourceSeasonId){
   const zones={A:replace(oldZones.A,relegated,promoted),B:replace(oldZones.B,relegated,promoted)};
   nextZones.set(inter.id,zones);nextParticipants.set(inter.id,[...zones.A,...zones.B]);
   nextParticipants.set(second.id,replace(second.participants,promoted,relegated));
+  const rosterSwap=new Map();promoted.forEach((id,i)=>rosterSwap.set(id,relegated[i]));relegated.forEach((id,i)=>rosterSwap.set(id,promoted[i]));
+  sourceComps.filter(c=>c.uruguayType==='competencia-serie').forEach(c=>nextParticipants.set(c.id,c.participants.map(id=>rosterSwap.get(id)||id)));
  }
  if(country==='Brasil'&&divisions.A&&divisions.B){
   const relegated=getStandings(divisions.A).slice(-4).map(r=>r.id);
