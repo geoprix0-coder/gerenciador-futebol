@@ -368,6 +368,7 @@ function countrySeasonBlockers(country,season){
  competitions.forEach(c=>{
   if(country==='Colômbia'&&c.colombiaTournaments)Object.entries(c.colombiaTournaments).forEach(([phase,t])=>{const rs=t.rounds||[],done=rs.length>0&&rs.every(r=>r.matches.length>0&&r.matches.every(m=>m.homeGoals!==null&&m.awayGoals!==null));if(!done)blockers.push(c.name+' · '+phase+': fase regular ainda não foi concluída.');});
   if(country==='Colômbia'&&c.colombiaDivision==='Primera División'&&!colombiaRelegationDecision(season.year).ready)blockers.push('Primera División: tabela de promedios ainda não pode definir os dois rebaixados.');
+  if(country==='Colômbia'&&c.colombiaTournaments)Object.entries(c.colombiaTournaments).forEach(([phase,t])=>{if(!t.playoff||t.playoff.stage!=='completed')blockers.push(c.name+' · '+phase+': fase final ainda não foi concluída.');});
   const rounds=c.rounds||[];
   const regularDone=rounds.length>0&&rounds.every(r=>r.matches.length>0&&r.matches.every(m=>m.homeGoals!==null&&m.awayGoals!==null));
   if(!regularDone)blockers.push(c.name+': fase regular ainda tem jogos pendentes ou calendário não gerado.');
