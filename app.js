@@ -634,12 +634,26 @@ function boliviaCreateIndirectPlayoff(c,season){
  return true;
 }
 function boliviaSimulateIndirectPlayoff(c){if(!c?.boliviaIndirectPlayoff||chileTieWinner(c.boliviaIndirectPlayoff))return;chileSimulateTie(c.boliviaIndirectPlayoff);}
+function boliviaQualifiedGroupIds(c){
+ const keys=Object.keys(c.boliviaGroups||{}),tables=Object.fromEntries(keys.map(k=>[k,boliviaGroupTable(c,k)]));
+ if(c.boliviaDivision==='Copa de la División Profesional')return new Set(keys.flatMap(k=>(tables[k]||[]).slice(0,2).map(r=>r.id)));
+ if(c.boliviaDivision==='Copa Simón Bolívar'){
+  const thirds=keys.map(k=>tables[k]?.[2]).filter(Boolean).sort((a,b)=>b.points-a.points||(b.gf-b.ga)-(a.gf-a.ga)||b.gf-a.gf||a.club.name.localeCompare(b.club.name,'pt-BR'));
+  return new Set([...keys.flatMap(k=>(tables[k]||[]).slice(0,2).map(r=>r.id)),...thirds.slice(0,4).map(r=>r.id)]);
+ }
+ return new Set();
+}
 function boliviaTableView(c){
- if(c.boliviaDivision==='Primera División'){const rows=getStandings(c);return '<div class="argentina-rules"><p>Liga em turno e returno · 30 rodadas. O último colocado é rebaixado; o penúltimo disputa o acesso indireto.</p></div>'+peruTableHtml(rows,Object.fromEntries(rows.slice(-2).map((r,i)=>[r.id,i===0?'zone-relegation':'zone-warning'])));}
- const tables=Object.keys(c.boliviaGroups||{}).map(k=>'<h3 class="season-heading">Grupo '+k+'</h3>'+peruTableHtml(boliviaGroupTable(c,k))).join('');
+ if(c.boliviaDivision==='Primera División'){
+  const rows=getStandings(c),last=rows.slice(-1),playoff=rows.slice(-2,-1),classes={};last.forEach(r=>classes[r.id]='zone-relegation');playoff.forEach(r=>classes[r.id]='zone-playoff');
+  return '<div class="argentina-rules"><p>Liga em turno e returno · 30 rodadas. O último colocado é rebaixado diretamente; o penúltimo disputa o playoff de ascenso/descenso contra o vice-campeão da Copa Simón Bolívar.</p></div>'+peruTableHtml(rows,classes)+'<div class="table-legend"><span class="legend-item relegation">Rebaixamento direto · último colocado</span><span class="legend-item playoff">Playoff de ascenso/descenso · penúltimo colocado</span></div>';
+ }
+ const qualified=boliviaQualifiedGroupIds(c);
+ const tables=Object.keys(c.boliviaGroups||{}).map(k=>{const rows=boliviaGroupTable(c,k),classes=Object.fromEntries(rows.filter(r=>qualified.has(r.id)).map(r=>[r.id,'zone-access']));return '<h3 class="season-heading">Grupo '+k+'</h3>'+peruTableHtml(rows,classes);}).join('');
  const knockout=c.boliviaKnockout?'<h3 class="season-heading">Fase final · Mata-mata</h3><div class="playoff-panel">'+boliviaKnockoutHtml(c.boliviaKnockout)+(c.boliviaKnockout.completed?'<p class="access-confirmation">Campeão: '+esc(getClub(c.boliviaKnockout.champion)?.name||'')+'</p>':'')+'</div>':'';
  const rule=c.boliviaDivision==='Copa Simón Bolívar'?'Os dois primeiros de cada grupo e os quatro melhores terceiros avançam às oitavas. O campeão sobe diretamente.':'Os dois primeiros de cada grupo avançam às quartas de final.';
- return '<div class="argentina-rules"><p>'+rule+'</p></div>'+tables+knockout;
+ const legend=c.boliviaDivision==='Copa Simón Bolívar'?'<div class="table-legend"><span class="legend-item access">Classificados às oitavas · 2 primeiros por grupo + 4 melhores terceiros</span></div>':'<div class="table-legend"><span class="legend-item access">Classificados às quartas · 2 primeiros de cada grupo</span></div>';
+ return '<div class="argentina-rules"><p>'+rule+'</p></div>'+tables+legend+knockout;
 }
 function boliviaTiePanel(c,season){
  if(c.boliviaDivision==='Primera División'){
