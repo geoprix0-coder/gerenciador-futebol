@@ -90,3 +90,9 @@
 .country-heading-actions{display:flex;align-items:center;justify-content:flex-end;gap:10px;flex-wrap:wrap}
 .country-advance{white-space:nowrap}
 @media(max-width:700px){.country-heading-actions{justify-content:flex-start}.country-advance{white-space:normal}}
+
+/* Country season history selector */
+.country-heading-main{display:flex;align-items:center;gap:16px;flex-wrap:wrap}
+.season-history-select{display:flex;align-items:center;gap:8px;color:var(--muted);font-size:11px}
+.season-history-select select{padding:8px 10px;min-width:115px}
+@media(max-width:600px){.country-heading-main{align-items:flex-start;flex-direction:column;gap:9px}.season-history-select{width:100%;justify-content:space-between}.season-history-select select{flex:1;max-width:180px}}
