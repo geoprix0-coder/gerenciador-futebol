@@ -706,6 +706,17 @@ function advanceCountrySeason(country,sourceSeasonId){
    nextParticipants.set(second.id,[...second.participants.filter(id=>!promoted.includes(id)),...relegated]);
   }
  }
+ if(country==='Equador'){
+  const first=sourceComps.find(c=>c.ecuadorDivision==='Serie A'),second=sourceComps.find(c=>c.ecuadorDivision==='Serie B');
+  if(first&&second){
+   if(!ecuadorFinalComplete(first)||!ecuadorFinalComplete(second)){alert('As fases finais da Serie A e da Serie B precisam ser concluídas.');return;}
+   const relegated=ecuadorStageTable(first,first.ecuadorGroups.descenso).slice(-2).map(r=>r.id);
+   const promoted=ecuadorStageTable(second,second.ecuadorGroups.ascenso).slice(0,2).map(r=>r.id);
+   if(relegated.length!==2||promoted.length!==2){alert('Não foi possível definir os dois promovidos e os dois rebaixados do Equador.');return;}
+   nextParticipants.set(first.id,[...first.participants.filter(id=>!relegated.includes(id)),...promoted]);
+   nextParticipants.set(second.id,[...second.participants.filter(id=>!promoted.includes(id)),...relegated]);
+  }
+ }
  if(country==='Peru'){const ap=sourceComps.find(c=>c.peruPhase==='Apertura'),cl=sourceComps.find(c=>c.peruPhase==='Clausura'),second=sourceComps.find(c=>c.peruDivision==='Liga 2'),relegated=peruAnnualTable(source.year).slice(-2).map(r=>r.id),promoted=[second?.peruPlayoffs?.champion,second?.peruPlayoffs?.promotedSecond].filter(Boolean);if(!ap||!cl||!second||relegated.length!==2||promoted.length!==2){alert('Não foi possível definir os dois promovidos e os dois rebaixados do Peru.');return;}[ap,cl].forEach(x=>nextParticipants.set(x.id,[...x.participants.filter(id=>!relegated.includes(id)),...promoted]));nextParticipants.set(second.id,[...second.participants.filter(id=>!promoted.includes(id)),...relegated]);const zones={A:[...second.zones.A],B:[...second.zones.B]};relegated.forEach((id,i)=>{const outgoing=promoted[i];let z=Object.keys(zones).find(k=>zones[k].includes(outgoing));if(!z)z=zones.A.length<=zones.B.length?'A':'B';const at=zones[z].indexOf(outgoing);if(at>=0)zones[z][at]=id;});nextZones.set(second.id,zones);}
  if(country==='Chile'){
   const first=sourceComps.find(c=>c.chileDivision==='Primera División'),second=sourceComps.find(c=>c.chileDivision==='Primera B');
@@ -737,7 +748,7 @@ function advanceCountrySeason(country,sourceSeasonId){
  source.countryAdvancements=source.countryAdvancements||{};
  source.countryAdvancements[country]=nextYear;
  sourceComps.forEach(comp=>{
-  target.competitions.push({...Object.fromEntries(Object.entries(comp).filter(([k])=>!['rounds','playoffs','argentinaPlayoffs','uruguayChampionship','uruguayAccess','uruguayIntermedioFinal','uruguayCompetenciaFinal','colombiaPromotion','chilePlayoffs','chileTitleTie','peruPlayoffs','peruFinalGroups','peruBonus','peruRegionalRounds','peruFinalRounds'].includes(k))),id:uid(),name:comp.name,country,division:comp.division||'',participants:nextParticipants.get(comp.id)||[...comp.participants],...(nextZones.has(comp.id)?{zones:nextZones.get(comp.id)}:{}),...(comp.peruDivision==='Liga 2'?{peruStage:'regional'}:{}),...(comp.colombiaTournaments?{colombiaTournaments:{Apertura:{label:'Apertura',rounds:[]},Clausura:{label:'Clausura',rounds:[]}},colombiaActivePhase:'Apertura',colombiaStageView:'first'}:{}),format:comp.format||'A definir'});
+  target.competitions.push({...Object.fromEntries(Object.entries(comp).filter(([k])=>!['rounds','playoffs','argentinaPlayoffs','uruguayChampionship','uruguayAccess','uruguayIntermedioFinal','uruguayCompetenciaFinal','colombiaPromotion','chilePlayoffs','chileTitleTie','peruPlayoffs','peruFinalGroups','peruBonus','peruRegionalRounds','peruFinalRounds','ecuadorRegularRounds','ecuadorFinalRounds','ecuadorGroups'].includes(k))),id:uid(),name:comp.name,country,division:comp.division||'',participants:nextParticipants.get(comp.id)||[...comp.participants],...(nextZones.has(comp.id)?{zones:nextZones.get(comp.id)}:{}),...(comp.peruDivision==='Liga 2'?{peruStage:'regional'}:{}),...(comp.ecuadorDivision?{ecuadorStage:'regular'}:{}),...(comp.colombiaTournaments?{colombiaTournaments:{Apertura:{label:'Apertura',rounds:[]},Clausura:{label:'Clausura',rounds:[]}},colombiaActivePhase:'Apertura',colombiaStageView:'first'}:{}),format:comp.format||'A definir'});
  });
  save();renderCompetitions();
  alert(country==='Brasil'&&divisions.A&&divisions.B?'Temporada '+nextYear+' criada! Os quatro últimos da Série A foram rebaixados, e os quatro promovidos da Série B foram definidos. As forças acumuladas dos clubes foram preservadas.':country==='Colômbia'?'Temporada '+nextYear+' criada! Promovidos à Primera División: '+(colombiaPromotionStatus(sourceComps.find(c=>c.colombiaDivision==='Segunda División'))?.promoted||[]).map(id=>getClub(id)?.name||'').join(' e ')+'. Os rebaixados também foram substituídos, e as forças dos clubes foram preservadas.':'Temporada '+nextYear+' criada! Os participantes e as forças acumuladas dos clubes foram preservados.');
