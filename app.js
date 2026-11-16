@@ -218,18 +218,15 @@ function buildArgentinaSchedule(competition){
    }
    return rounds;
   };
-  const a=makeRounds(zoneA),b=makeRounds(zoneB),rounds=[];
+  const a=makeRounds(zoneA),b=makeRounds(zoneB),rounds=[],pairs=competition.classicPairs||[];
   for(let i=0;i<15;i++){
-   const cross=[{home:a[i].bye,away:b[i].bye,homeGoals:null,awayGoals:null,kind:'interzonal'}];
-   rounds.push({number:i+1,matches:[...a[i].matches,...b[i].matches,...cross]});
+   const pair=pairs[i]||[];
+   const roundA=a.find(r=>r.bye===pair[0])||a[i],roundB=b.find(r=>r.bye===pair[1])||b[i];
+   const cross=[{home:pair[0]||roundA.bye,away:pair[1]||roundB.bye,homeGoals:null,awayGoals:null,kind:'interzonal'}];
+   rounds.push({number:i+1,matches:[...roundA.matches,...roundB.matches,...cross]});
   }
-  const pairs=competition.classicPairs||[];
-  const extra=pairs.map((p,i)=>({home:competition.phase==='Clausura'?p[1]:p[0],away:competition.phase==='Clausura'?p[0]:p[1],homeGoals:null,awayGoals:null,kind:'interzonal'}));
-  rounds.push({number:16,matches:extra});
-  if(competition.phase==='Clausura'){
-   const apertura=latestSeason()?.competitions.find(c=>c.argentinaType==='primera'&&c.phase==='Apertura');
-   if(apertura?.rounds)rounds.forEach((r,i)=>{const source=apertura.rounds[i];if(source)r.matches.forEach(m=>{const prior=source.matches.find(x=>(x.home===m.home&&x.away===m.away)||(x.home===m.away&&x.away===m.home));if(prior){m.home=prior.away;m.away=prior.home;}});});
-  }
+  rounds.push({number:16,matches:pairs.map(p=>({home:p[0],away:p[1],homeGoals:null,awayGoals:null,kind:'interzonal'}))});
+  if(competition.phase==='Clausura')rounds.forEach(r=>r.matches.forEach(m=>{const home=m.home;m.home=m.away;m.away=home;}));
   competition.rounds=rounds;
  }else{
   const makeDouble=ids=>{
