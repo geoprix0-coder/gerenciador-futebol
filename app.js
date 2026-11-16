@@ -332,6 +332,41 @@ function argentinaRelegationDecision(year){
  const annualRelegated=annualBottom.id===lowestAverage.id?annual[annual.length-2]:annualBottom;
  return {ready:true,relegated:[lowestAverage.id,annualRelegated.id],promedios:lowestAverage.id,annual:annualRelegated.id,average:lowestAverage.average,years:argentinaPromediosTable(year).years};
 }
+function repairArgentinaAdvancedGroups(){
+ let changed=false;
+ seasons.filter(s=>s.countryAdvancements?.Argentina).forEach(source=>{
+  const nextYear=source.countryAdvancements.Argentina;
+  const target=seasons.find(s=>s.year===nextYear);
+  if(!target)return;
+  const sourceFirst=source.competitions.find(c=>c.argentinaType==='primera');
+  const sourceSecond=source.competitions.find(c=>c.argentinaType==='nacional');
+  const targetFirst=target.competitions.find(c=>c.argentinaType==='primera');
+  const targetSecond=target.competitions.find(c=>c.argentinaType==='nacional');
+  if(!sourceFirst||!sourceSecond||!targetFirst||!targetSecond)return;
+  const decision=argentinaRelegationDecision(source.year);
+  const promoted=[sourceSecond.argentinaPlayoffs?.promotedDirect,sourceSecond.argentinaPlayoffs?.promotedReduced].filter(Boolean);
+  if(!decision.ready||promoted.length!==2)return;
+  const same=(a,b)=>JSON.stringify(a||{})===JSON.stringify(b||{});
+  if(!same(targetFirst.zones,sourceFirst.zones)||!same(targetSecond.zones,sourceSecond.zones))return;
+  const replace=(competition,outgoing,incoming)=>{
+   const zones={A:[...(competition.zones?.A||[])],B:[...(competition.zones?.B||[])]};
+   outgoing.forEach((id,index)=>{
+    let key=Object.keys(zones).find(k=>zones[k].includes(id));
+    if(!key)key=zones.A.length<=zones.B.length?'A':'B';
+    const pos=zones[key].indexOf(id);
+    if(pos>=0)zones[key][pos]=incoming[index];else zones[key].push(incoming[index]);
+   });
+   return zones;
+  };
+  const firstZones=replace(sourceFirst,decision.relegated,promoted);
+  const secondZones=replace(sourceSecond,promoted,decision.relegated);
+  target.competitions.filter(c=>c.argentinaType==='primera').forEach(comp=>{comp.zones={A:[...firstZones.A],B:[...firstZones.B]};comp.participants=[...firstZones.A,...firstZones.B];});
+  targetSecond.zones=secondZones;
+  targetSecond.participants=[...secondZones.A,...secondZones.B];
+  changed=true;
+ });
+ if(changed)save();
+}
 function argentinaZoneStandings(competition,zone){
  const ids=competition.zones?.[zone]||[];
  const rows=ids.map(id=>({id,club:getClub(id),points:0,played:0,wins:0,draws:0,losses:0,gf:0,ga:0}));
@@ -568,4 +603,5 @@ function renderSeasonDetail(id){
  target.querySelectorAll('[data-add-participant]').forEach(b=>b.addEventListener('click',()=>{const comp=s.competitions.find(c=>c.id===b.dataset.addParticipant),select=document.querySelector('#add-'+comp.id),clubId=select.value;if(!clubId)return;if(comp.participants.length>=(comp.argentinaType==='nacional'?36:comp.argentinaType==='primera'?30:20)){alert('Esta competição já atingiu o limite de participantes.');return;}if(!comp.argentinaType&&s.competitions.some(other=>other!==comp&&other.participants.includes(clubId))){alert('Este clube já está inscrito na outra divisão desta temporada.');return;}comp.participants.push(clubId);save();renderSeasonDetail(id);}));
 }
 document.querySelectorAll('.nav-item').forEach(b=>b.addEventListener('click',()=>render(b.dataset.view)));
+repairArgentinaAdvancedGroups();
 render();
