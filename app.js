@@ -33,7 +33,18 @@ const labels={inicio:'Painel inicial',competicoes:'Competições',clubes:'Clubes
 function save(){data={clubs,seasons};localStorage.setItem(STORE,JSON.stringify(data));}
 function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
 function getClub(id){return clubs.find(c=>c.id===id);}
-function clubRating(club){return {overall:Number(club.overall)||50,attack:Number(club.attack)||50,defense:Number(club.defense)||50};}
+function randomInt(min,max){return Math.floor(Math.random()*(max-min+1))+min;}
+function boundedRating(value){return Math.max(1,Math.min(100,Math.round(value)));}
+function initializeClubRating(club){
+ if(club.initialRating&&Number.isFinite(club.initialRating.overall)){club.overall=club.initialRating.overall;club.attack=club.initialRating.attack;club.defense=club.initialRating.defense;return;}
+ const overall=Number.isFinite(club.overall)?boundedRating(club.overall):randomInt(48,84);
+ const attack=Number.isFinite(club.attack)?boundedRating(club.attack):boundedRating(overall+randomInt(-9,9));
+ const defense=Number.isFinite(club.defense)?boundedRating(club.defense):boundedRating(overall+randomInt(-9,9));
+ club.overall=overall;club.attack=attack;club.defense=defense;club.initialRating={overall,attack,defense};
+}
+clubs.forEach(initializeClubRating);
+save();
+function clubRating(club){initializeClubRating(club);return {overall:Number(club.overall),attack:Number(club.attack),defense:Number(club.defense)};}
 function clubLink(club,label){return '<button class="club-link" data-open-club="'+club.id+'">'+esc(label||club.name)+'</button>';}
 function latestSeason(){return [...seasons].sort((a,b)=>b.year-a.year)[0];}
 function render(page='inicio'){
@@ -45,13 +56,23 @@ function render(page='inicio'){
  else if(page==='competicoes')renderCompetitions();
  else {const desc={partidas:'As partidas serão geradas pelo calendário e terão resultados simulados automaticamente.',classificacao:'A classificação será calculada automaticamente a partir dos resultados das partidas.',historico:'As temporadas concluídas e as avaliações dos clubes ficarão registradas aqui.'};view.innerHTML='<div class="panel"><h3>'+labels[page]+'</h3><p class="muted">'+desc[page]+'</p><div class="empty">Este módulo será desenvolvido em uma próxima etapa.</div></div>';}
 }
+function resetTestMatches(){
+ const hasTestData=seasons.some(s=>s.competitions.some(c=>Array.isArray(c.rounds)&&c.rounds.length));
+ if(!hasTestData){alert('Ainda não existem calendários ou resultados para resetar.');return;}
+ if(!confirm('Isso apagará todos os calendários e resultados gerados em todas as temporadas e restaurará a força inicial dos clubes. Os clubes e participantes serão mantidos. Continuar?'))return;
+ seasons.forEach(s=>{s.competitions.forEach(c=>{delete c.rounds;});s.status='Preparação';});
+ clubs.forEach(club=>{initializeClubRating(club);club.overall=club.initialRating.overall;club.attack=club.initialRating.attack;club.defense=club.initialRating.defense;});
+ save();render('inicio');alert('Calendários, resultados e alterações de força foram resetados.');
+}
 function renderHome(){
  const season=latestSeason();
  view.innerHTML=`
  <div class="welcome"><span class="eyebrow">SEU UNIVERSO DE FUTEBOL</span><h2>Uma nova temporada começa aqui.</h2><p>Gerencie clubes, organize competições e simule campeonatos. Os resultados criados aqui formarão a história própria do seu futebol.</p></div>
  <div class="grid"><div class="card"><small>CLUBES CADASTRADOS</small><strong>${clubs.length}</strong></div><div class="card"><small>COMPETIÇÕES INICIAIS</small><strong>02</strong></div><div class="card"><small>TEMPORADAS CADASTRADAS</small><strong>${seasons.length}</strong></div></div>
  <div class="panel"><div class="panel-head"><h3>Primeira temporada · ${season.year}</h3><span class="tag">${esc(season.status)}</span></div>${season.competitions.map(c=>`<div class="competition-row"><div><strong>${esc(c.name)}</strong><small>${c.participants.length} clubes · Formato: ${esc(c.format)}</small></div><span class="tag">Cadastrada</span></div>`).join('')}</div>
- <div class="panel"><h3>Regra de evolução dos clubes</h3><p class="muted">Dados reais são usados somente para a avaliação inicial. Depois disso, a força muda exclusivamente pelos resultados simulados dentro do sistema. Promoção e rebaixamento não alteram ratings automaticamente.</p></div>`;
+ <div class="panel"><h3>Regra de evolução dos clubes</h3><p class="muted">A força muda exclusivamente pelos resultados simulados. Promoção e rebaixamento não alteram ratings automaticamente.</p></div>
+ <div class="panel reset-panel"><div><h3>Ferramentas da fase de testes</h3><p class="muted">Apaga calendários e resultados simulados e restaura as forças iniciais. Clubes e participantes serão preservados.</p></div><button class="btn danger" id="reset-test-games">Resetar jogos de teste</button></div>`;
+ document.querySelector('#reset-test-games').addEventListener('click',resetTestMatches);
 }
 function renderClubDetail(clubId,back={type:'clubs'}){
  const club=getClub(clubId);if(!club)return;const rating=clubRating(club);
@@ -64,7 +85,7 @@ function renderClubs(){
  view.innerHTML=`<div class="panel"><div class="panel-head"><h3>Cadastro de clubes</h3><span class="tag">CADASTRO ÚNICO</span></div><p class="muted">Cada clube existe uma única vez no cadastro e pode participar de várias temporadas e divisões.</p><form id="club-form"><div class="form-row"><div class="field"><label for="club-name">Nome do clube</label><input id="club-name" required maxlength="70" placeholder="Ex.: Clube de Futebol"></div><div class="field"><label for="club-state">Estado (UF)</label><input id="club-state" maxlength="2" placeholder="Ex.: MG"></div><button class="btn" type="submit">Adicionar clube</button></div></form></div>
  <div class="panel"><div class="panel-head"><h3>Clubes cadastrados</h3><span class="tag">${clubs.length} REGISTROS</span></div>${clubs.length?'<div class="club-list">'+[...clubs].sort((a,b)=>a.name.localeCompare(b.name,'pt-BR')).map(c=>'<div class="club"><span>'+clubLink(c,c.name)+(c.state?' · '+esc(c.state):'')+'</span></div>').join('')+'</div>':'<div class="empty">Nenhum clube cadastrado.</div>'}</div>`;
  view.querySelectorAll('[data-open-club]').forEach(b=>b.addEventListener('click',()=>renderClubDetail(b.dataset.openClub)));
- document.querySelector('#club-form').addEventListener('submit',e=>{e.preventDefault();const name=document.querySelector('#club-name').value.trim(),state=document.querySelector('#club-state').value.trim().toUpperCase();if(!name)return;if(clubs.some(c=>slugify(c.name)===slugify(name))){alert('Este clube já está cadastrado.');return;}clubs.push({id:uid(),name,state,slug:slugify(name)});save();renderClubs();});
+ document.querySelector('#club-form').addEventListener('submit',e=>{e.preventDefault();const name=document.querySelector('#club-name').value.trim(),state=document.querySelector('#club-state').value.trim().toUpperCase();if(!name)return;if(clubs.some(c=>slugify(c.name)===slugify(name))){alert('Este clube já está cadastrado.');return;}const club={id:uid(),name,state,slug:slugify(name)};initializeClubRating(club);clubs.push(club);save();renderClubs();});
 }
 function renderCompetitions(){
  view.innerHTML='<div class="panel"><div class="panel-head"><h3>Competições cadastradas</h3><span class="tag">SÉRIE A + SÉRIE B</span></div><p class="muted">Clique em uma competição para abrir sua página, consultar a classificação, os jogos e os clubes participantes.</p>'+[...seasons].sort((a,b)=>b.year-a.year).map(s=>'<h3 class="season-heading">'+s.year+'</h3>'+s.competitions.map(c=>'<button class="competition-open" data-open-competition="'+s.id+'|'+c.id+'"><span><strong>'+esc(c.name)+'</strong><small>'+c.participants.length+' participantes · Formato: '+esc(c.format)+'</small></span><span class="competition-open-action">Abrir competição →</span></button>').join('')).join('')+'</div>';
@@ -82,12 +103,25 @@ function buildSchedule(competition){
  competition.rounds=first.concat(first.map((r,i)=>({number:size-1+i+1,matches:r.matches.map(m=>({home:m.away,away:m.home,homeGoals:null,awayGoals:null}))})));
 }
 function simulateMatch(match){
- const h=clubRating(getClub(match.home)),a=clubRating(getClub(match.away));
+ const homeClub=getClub(match.home),awayClub=getClub(match.away);
+ const h=clubRating(homeClub),a=clubRating(awayClub);
  const expected=1/(1+Math.pow(10,((a.overall-h.overall)-3)/22));
  const homeLambda=Math.max(.25,1.25+expected*.9+(h.attack-a.defense)/100);
  const awayLambda=Math.max(.2,1.15+(1-expected)*.8+(a.attack-h.defense)/100);
  const poisson=lambda=>{const limit=Math.exp(-lambda);let k=0,p=1;do{k++;p*=Math.random();}while(p>limit&&k<12);return k-1;};
  match.homeGoals=poisson(homeLambda);match.awayGoals=poisson(awayLambda);
+ updateClubRatingsAfterMatch(homeClub,awayClub,match.homeGoals,match.awayGoals);
+}
+function updateClubRatingsAfterMatch(home,away,homeGoals,awayGoals){
+ const h=clubRating(home),a=clubRating(away);
+ const expectedHome=1/(1+Math.pow(10,((a.overall-h.overall)-3)/22));
+ const actualHome=homeGoals>awayGoals?1:homeGoals<awayGoals?0:.5;
+ const margin=Math.min(3,Math.abs(homeGoals-awayGoals)),k=2.2*(1+margin*.12),shift=k*(actualHome-expectedHome);
+ home.overall=boundedRating(h.overall+shift);away.overall=boundedRating(a.overall-shift);
+ home.attack=boundedRating(h.attack+Math.max(-1.8,Math.min(1.8,(homeGoals-(1.25+(h.attack-a.defense)/35))*.55)));
+ away.attack=boundedRating(a.attack+Math.max(-1.8,Math.min(1.8,(awayGoals-(1.15+(a.attack-h.defense)/35))*.55)));
+ home.defense=boundedRating(h.defense+Math.max(-1.5,Math.min(1.5,((1.15+(a.attack-h.defense)/35)-awayGoals)*.4)));
+ away.defense=boundedRating(a.defense+Math.max(-1.5,Math.min(1.5,((1.25+(h.attack-a.defense)/35)-homeGoals)*.4)));
 }
 function getStandings(competition){
  const rows=competition.participants.map(id=>({id,club:getClub(id),points:0,played:0,wins:0,draws:0,losses:0,gf:0,ga:0}));
