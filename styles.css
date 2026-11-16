@@ -47,3 +47,10 @@
 .fixture-team.away{text-align:right}
 .score{text-align:center;font:800 14px Manrope}
 @media(max-width:700px){.rating-grid{grid-template-columns:1fr 1fr}.rating-bars{grid-template-columns:1fr}.fixture{grid-template-columns:minmax(0,1fr) 55px minmax(0,1fr);gap:5px;padding:10px 8px}.fixture-team .club-link{font-size:11px}.round-actions{align-items:flex-start;flex-direction:column}}
+
+/* Initial variable ratings and test reset controls */
+.reset-panel{display:flex;align-items:center;justify-content:space-between;gap:18px}
+.reset-panel .muted{margin-bottom:0}
+.btn.danger{background:#8e3444;color:#fff}
+.btn.danger:hover{background:#a83d50}
+@media(max-width:650px){.reset-panel{align-items:flex-start;flex-direction:column}}
