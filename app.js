@@ -40,7 +40,7 @@ function initialData(){
  const add=(name,state,id)=>{const key=slugify(name);if(!clubs.some(c=>slugify(c.name)===key))clubs.push({id:id||key,name,state:state||'',slug:key});};
  old.forEach(c=>add(c.name,c.state,c.id));
  SEED_2026.forEach(([name,state])=>add(name,state));
- [...ARGENTINA_PRIMERA_2026.A,...ARGENTINA_PRIMERA_2026.B,...ARGENTINA_NACIONAL_2026.A,...ARGENTINA_NACIONAL_2026.B].forEach(name=>add(name,'ARG'));
+ [...ARGENTINA_PRIMERA_2026.A,...ARGENTINA_PRIMERA_2026.B,...ARGENTINA_NACIONAL_2026.A,...ARGENTINA_NACIONAL_2026.B].forEach(name=>add(name,''));
  const byName=name=>clubs.find(c=>slugify(c.name)===slugify(name)).id;
  const a=SEED_2026.filter(x=>x[2]==='A').map(x=>byName(x[0]));
  const b=SEED_2026.filter(x=>x[2]==='B').map(x=>byName(x[0]));
@@ -77,6 +77,21 @@ function initializeClubRating(club){
  const defense=Number.isFinite(club.defense)?boundedRating(club.defense):boundedRating(overall+randomInt(-9,9));
  club.overall=overall;club.attack=attack;club.defense=defense;club.initialRating={overall,attack,defense};
 }
+function ensureArgentina2026(){
+ const findOrAdd=name=>{let club=clubs.find(c=>slugify(c.name)===slugify(name));if(!club){club={id:uid(),name,state:'',slug:slugify(name)};initializeClubRating(club);clubs.push(club);}return club.id;};
+ const ids=names=>names.map(findOrAdd);
+ const existing=seasons.find(s=>s.year===2026);
+ if(!existing)return;
+ const make=(id,name,division,format,type,phase,zones,pairs)=>({id,name,country:'Argentina',division,format,argentinaType:type,phase,zones:{A:ids(zones.A),B:ids(zones.B)},classicPairs:pairs.map(p=>p.map(findOrAdd)),participants:[...ids(zones.A),...ids(zones.B)]});
+ if(!existing.competitions.some(c=>c.country==='Argentina')){
+  existing.competitions.push(
+   make('arg-primera-apertura-2026','Primera División · Torneo Apertura','Primera División','2026 · 2 zonas de 15 · 16 datas + playoffs','primera','Apertura',ARGENTINA_PRIMERA_2026,ARGENTINA_CLASICOS_2026),
+   make('arg-primera-clausura-2026','Primera División · Torneo Clausura','Primera División','2026 · mesmas zonas · localías invertidas + playoffs','primera','Clausura',ARGENTINA_PRIMERA_2026,ARGENTINA_CLASICOS_2026),
+   make('arg-nacional-2026','Primera Nacional','Primera Nacional','2026 · 2 zonas de 18 · 36 datas · 2 acessos','nacional','',ARGENTINA_NACIONAL_2026,ARGENTINA_NACIONAL_CLASICOS_2026)
+  );
+ }
+}
+ensureArgentina2026();
 seasons.forEach(season=>season.competitions.forEach(competition=>{if(!competition.country)competition.country='Brasil';}));
 clubs.forEach(initializeClubRating);
 save();
@@ -243,7 +258,7 @@ function argentinaZoneStandings(competition,zone){
   const h=map.get(m.home),a=map.get(m.away);
   if(h){h.played++;h.gf+=m.homeGoals;h.ga+=m.awayGoals;}
   if(a){a.played++;a.gf+=m.awayGoals;a.ga+=m.homeGoals;}
-  if(h&&a){if(m.homeGoals>m.awayGoals){h.wins++;h.points+=3;a.losses++;}else if(m.homeGoals<m.awayGoals){a.wins++;a.points+=3;h.losses++;}else{h.draws++;a.draws++;h.points++;a.points++;}}
+  if(m.homeGoals>m.awayGoals){if(h){h.wins++;h.points+=3;}if(a)a.losses++;}else if(m.homeGoals<m.awayGoals){if(a){a.wins++;a.points+=3;}if(h)h.losses++;}else{if(h){h.draws++;h.points++;}if(a){a.draws++;a.points++;}}
  }));
  return rows.sort((a,b)=>b.points-a.points||(b.gf-b.ga)-(a.gf-a.ga)||b.gf-a.gf||a.club.name.localeCompare(b.club.name,'pt-BR'));
 }
