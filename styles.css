@@ -96,3 +96,13 @@
 .season-history-select{display:flex;align-items:center;gap:8px;color:var(--muted);font-size:11px}
 .season-history-select select{padding:8px 10px;min-width:115px}
 @media(max-width:600px){.country-heading-main{align-items:flex-start;flex-direction:column;gap:9px}.season-history-select{width:100%;justify-content:space-between}.season-history-select select{flex:1;max-width:180px}}
+
+/* Navegação compacta por país */
+.country-toggle{width:100%;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:16px 18px;background:linear-gradient(100deg,#1a3045,#142338);border:1px solid #2b455d;border-radius:10px;color:var(--accent);font:800 17px Manrope;text-align:left;cursor:pointer}
+.country-toggle:hover{border-color:var(--accent)}
+.country-toggle-icon{font:700 20px Manrope;color:var(--muted)}
+.country-content{padding:14px 4px 4px}
+.country-content[hidden]{display:none}
+.country-tools{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:12px}
+.country-competitions{display:grid;gap:9px}
+@media(max-width:600px){.country-tools{align-items:flex-start;flex-direction:column}.country-tools .season-history-select{width:100%;justify-content:space-between}.country-tools .season-history-select select{flex:1;max-width:180px}}
