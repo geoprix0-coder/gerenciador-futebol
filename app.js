@@ -154,6 +154,7 @@ function countrySeasonReady(country,season){
   const rounds=c.rounds||[];
   const regularDone=rounds.length>0&&rounds.every(r=>r.matches.length>0&&r.matches.every(m=>m.homeGoals!==null&&m.awayGoals!==null));
   if(!regularDone)return false;
+  if(country==='Argentina'&&!c.argentinaPlayoffs?.completed)return false;
   if(country==='Brasil'&&c.division==='B'&&c.participants.length>=6){
    const ties=c.playoffs?.ties||[];
    return ties.length>0&&ties.every(t=>!!playoffWinner(t));
