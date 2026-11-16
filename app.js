@@ -209,27 +209,30 @@ function competitionChampion(competition){
 function countrySeason(country){
  return [...seasons].filter(season=>season.competitions.some(c=>(c.country||'Brasil')===country)).sort((a,b)=>b.year-a.year)[0]||null;
 }
-function countrySeasonReady(country,season){
- if(!season||season.countryAdvancements?.[country])return false;
+function countrySeasonBlockers(country,season){
+ if(!season)return ['Nenhuma temporada encontrada para este país.'];
+ if(season.countryAdvancements?.[country])return ['A temporada seguinte já foi criada.'];
  if(country==='Uruguai'){const clausura=season.competitions.find(c=>c.country==='Uruguai'&&c.uruguayType==='primera-clausura');if(clausura&&!clausura.uruguayChampionship)uruguayCreatePrimeraFinal(season.year);}
  const competitions=season.competitions.filter(c=>(c.country||'Brasil')===country&&!(country==='Uruguai'&&['intermedio-serie','competencia-serie'].includes(c.uruguayType)));
- if(!competitions.length)return false;
- return competitions.every(c=>{
+ if(!competitions.length)return ['Nenhuma competição cadastrada.'];
+ const blockers=[];
+ competitions.forEach(c=>{
   const rounds=c.rounds||[];
   const regularDone=rounds.length>0&&rounds.every(r=>r.matches.length>0&&r.matches.every(m=>m.homeGoals!==null&&m.awayGoals!==null));
-  if(!regularDone)return false;
-  if(country==='Argentina'&&!c.argentinaPlayoffs?.completed)return false;
-  if(country==='Uruguai'&&c.uruguayType==='primera-clausura'&&!c.uruguayChampionship?.completed)return false;
-  if(country==='Uruguai'&&c.uruguayType==='intermedio'&&!c.uruguayIntermedioFinal?.completed)return false;
-  if(country==='Uruguai'&&c.uruguayType==='competencia'&&!c.uruguayCompetenciaFinal?.completed)return false;
-  if(country==='Uruguai'&&c.uruguayType==='segunda-regular'&&!c.uruguayAccess?.completed)return false;
+  if(!regularDone)blockers.push(c.name+': fase regular ainda tem jogos pendentes ou calendário não gerado.');
+  if(country==='Argentina'&&!c.argentinaPlayoffs?.completed)blockers.push(c.name+': mata-mata ainda não foi concluído.');
+  if(country==='Uruguai'&&c.uruguayType==='primera-clausura'&&!c.uruguayChampionship?.completed)blockers.push('Campeonato Uruguaio: fase final ainda não foi concluída.');
+  if(country==='Uruguai'&&c.uruguayType==='intermedio'&&!c.uruguayIntermedioFinal?.completed)blockers.push('Torneo Intermedio: final entre as séries A e B ainda não foi concluída.');
+  if(country==='Uruguai'&&c.uruguayType==='competencia'&&!c.uruguayCompetenciaFinal?.completed)blockers.push('Torneo Competencia: final entre as séries A e B ainda não foi concluída.');
+  if(country==='Uruguai'&&c.uruguayType==='segunda-regular'&&!c.uruguayAccess?.completed)blockers.push('Segunda División: playoff pelo terceiro acesso ainda não foi concluído.');
   if(country==='Brasil'&&c.division==='B'&&c.participants.length>=6){
    const ties=c.playoffs?.ties||[];
-   return ties.length>0&&ties.every(t=>!!playoffWinner(t));
+   if(!ties.length||!ties.every(t=>!!playoffWinner(t)))blockers.push(c.name+': playoff de acesso ainda não foi concluído.');
   }
-  return true;
  });
+ return [...new Set(blockers)];
 }
+function countrySeasonReady(country,season){return countrySeasonBlockers(country,season).length===0;}
 function advanceCountrySeason(country,sourceSeasonId){
  const source=seasons.find(s=>s.id===sourceSeasonId);
  if(!countrySeasonReady(country,source)){alert('Ainda existem jogos pendentes neste país.');return;}
@@ -271,7 +274,7 @@ function advanceCountrySeason(country,sourceSeasonId){
   const first=sourceComps.find(c=>c.uruguayType==='primera-apertura'),inter=sourceComps.find(c=>c.uruguayType==='intermedio'),second=sourceComps.find(c=>c.uruguayType==='segunda-regular');
   const decision=uruguayRelegationDecision(source.year);
   if(!first||!inter||!second||!decision.ready){alert('Não foi possível calcular os rebaixamentos da Primera División.');return;}
-  const access=second.uruguayAccess,promoted=[...(access?.promotedDirect||[]),access?.promotedThird].filter(Boolean);
+  const access=second.uruguayAccess,promoted=[...getStandings(second).slice(0,2).map(r=>r.id),access?.promotedThird].filter(Boolean);
   if(promoted.length!==3){alert('O acesso da Segunda División ainda não definiu os três promovidos.');return;}
   const relegated=decision.relegated;
   const oldZones={A:[...(inter.zones?.A||[])],B:[...(inter.zones?.B||[])]};
@@ -311,7 +314,7 @@ function renderCompetitions(){
  const countries=[...new Set(seasons.flatMap(s=>s.competitions.map(c=>c.country||'Brasil')))].sort((a,b)=>a.localeCompare(b,'pt-BR'));
  const countrySections=countries.map(country=>{
   const available=[...seasons].filter(s=>s.competitions.some(c=>(c.country||'Brasil')===country)).sort((a,b)=>b.year-a.year);
-  const current=available[0]||null,canAdvance=countrySeasonReady(country,current);
+  const current=available[0]||null,advanceBlockers=countrySeasonBlockers(country,current),canAdvance=advanceBlockers.length===0;
   const list=current?current.competitions.filter(c=>(c.country||'Brasil')===country):[];
   const primera=list.filter(c=>c.argentinaType==='primera'),uruguayFirst=list.filter(c=>['primera-apertura','intermedio','intermedio-serie','primera-clausura'].includes(c.uruguayType)),uruguaySecond=list.filter(c=>['competencia','competencia-serie','segunda-regular'].includes(c.uruguayType));
   let html='';
@@ -319,7 +322,7 @@ function renderCompetitions(){
   if(uruguayFirst.length)html+='<button class="competition-open" data-open-competition="'+current.id+'|'+uruguayFirst[0].id+'"><span><strong>Primera División · Uruguai</strong><small>Apertura, Intermedio e Clausura · 16 clubes</small></span><span class="competition-open-action">Abrir campeonato →</span></button>';
   if(uruguaySecond.length)html+='<button class="competition-open" data-open-competition="'+current.id+'|'+uruguaySecond[0].id+'"><span><strong>Segunda División · Uruguai</strong><small>Torneo Competencia e Fase Regular · 14 clubes</small></span><span class="competition-open-action">Abrir campeonato →</span></button>';
   html+=list.filter(comp=>comp.argentinaType!=='primera'&&!comp.uruguayType).map(comp=>'<button class="competition-open" data-open-competition="'+current.id+'|'+comp.id+'"><span><strong>'+esc(comp.name)+'</strong><small>'+comp.participants.length+' participantes · Formato: '+esc(comp.format)+'</small></span><span class="competition-open-action">Abrir competição →</span></button>').join('');
-  return '<section class="country-group"><div class="country-heading"><div class="country-heading-main"><h2>'+esc(country)+'</h2><label class="season-history-select"><span>Temporada</span><select data-country-season="'+esc(country)+'">'+available.map(s=>'<option value="'+s.id+'" '+(s.id===current?.id?'selected':'')+'>'+s.year+(s.id===current?.id?' · atual':'')+'</option>').join('')+'</select></label></div><div class="country-heading-actions"><span class="tag">'+available.reduce((n,s)=>n+s.competitions.filter(c=>(c.country||'Brasil')===country).length,0)+' COMPETIÇÕES</span>'+(current.countryAdvancements?.[country]?'<button class="btn country-advance" disabled>Temporada seguinte já criada</button>':'<button class="btn country-advance" data-advance-country="'+esc(country)+'" data-source-season="'+current.id+'" '+(canAdvance?'':'disabled title="Conclua todas as competições e fases deste país para liberar o avanço."')+'>Avançar para temporada seguinte →</button>')+'</div></div>'+html+'</section>';
+  return '<section class="country-group"><div class="country-heading"><div class="country-heading-main"><h2>'+esc(country)+'</h2><label class="season-history-select"><span>Temporada</span><select data-country-season="'+esc(country)+'">'+available.map(s=>'<option value="'+s.id+'" '+(s.id===current?.id?'selected':'')+'>'+s.year+(s.id===current?.id?' · atual':'')+'</option>').join('')+'</select></label></div><div class="country-heading-actions"><span class="tag">'+available.reduce((n,s)=>n+s.competitions.filter(c=>(c.country||'Brasil')===country).length,0)+' COMPETIÇÕES</span>'+(current.countryAdvancements?.[country]?'<button class="btn country-advance" disabled>Temporada seguinte já criada</button>':'<button class="btn country-advance" data-advance-country="'+esc(country)+'" data-source-season="'+current.id+'" '+(canAdvance?'':'disabled title="Conclua todas as competições e fases deste país para liberar o avanço."')+'>Avançar para temporada seguinte →</button>')+'</div></div>'+(canAdvance?'':'<p class="muted country-advance-reason">Pendente: '+advanceBlockers.map(esc).join(' · ')+'</p>')+html+'</section>';
  }).join('');
  view.innerHTML='<div class="panel"><div class="panel-head"><h3>Competições por país</h3><span class="tag">'+countries.length+' PAÍS(ES)</span></div><p class="muted">A tela mostra por padrão a temporada mais recente. Use o seletor ao lado do país para consultar temporadas anteriores. O botão de avanço aparece quando todas as fases daquele país estiverem concluídas.</p>'+(countrySections||'<div class="empty">Nenhuma competição cadastrada.</div>')+'</div>';
  view.querySelectorAll('[data-country-season]').forEach(select=>select.addEventListener('change',()=>{
@@ -832,8 +835,8 @@ function renderCompetitionDetail(seasonId,competitionId,section='table'){
    content+='<h3 class="season-heading">Tabela de promedios · rebaixamento</h3><p class="muted">Média de pontos por jogo nas duas temporadas mais recentes disponíveis ('+esc(avg.years.join(' e '))+'). Em 2026, considera apenas a temporada disponível. Os três piores promedios serão rebaixados.</p><div class="table-wrap"><table class="standings"><thead><tr><th>#</th><th>Clube</th><th>Pontos</th><th>Jogos</th><th>Promedio</th></tr></thead><tbody>'+avg.rows.map((r,i)=>'<tr class="'+(decision.ready&&decision.relegated.includes(r.id)?'zone-relegation':'')+'"><td>'+(i+1)+'</td><td class="team-name">'+clubLink(getClub(r.id),getClub(r.id)?.name||'')+'</td><td>'+r.points+'</td><td>'+r.played+'</td><td>'+(r.average===null?'—':r.average.toFixed(3))+'</td></tr>').join('')+'</tbody></table></div><p class="muted">'+(decision.ready?'Três rebaixados previstos: '+decision.relegated.map(id=>esc(getClub(id)?.name||'')).join(', '):'Aguardando partidas para calcular os promedios.')+'</p>';
   }
   else if(competition.uruguayType==='segunda-regular'){
-   const p=competition.uruguayAccess,adv=p?.promotedDirect||[];
-   content='<div class="table-legend"><span class="legend-item access">Verde · 1º e 2º (acesso direto) e vencedor do playoff</span><span class="legend-item playoff">Amarelo · 3º ao 6º enquanto disputa o playoff</span></div><div class="table-wrap"><table class="standings"><thead><tr><th>#</th><th>Clube</th><th>P</th><th>J</th><th>V</th><th>E</th><th>D</th><th>GP</th><th>GC</th><th>SG</th></tr></thead><tbody>'+standings.map((r,i)=>'<tr class="'+(i<2||adv.includes(r.id)||p?.promotedThird===r.id?'zone-access':i<6?'zone-playoff':'')+'"><td>'+(i+1)+'</td><td class="team-name">'+clubLink(r.club,r.club.name)+'</td><td>'+r.points+'</td><td>'+r.played+'</td><td>'+r.wins+'</td><td>'+r.draws+'</td><td>'+r.losses+'</td><td>'+r.gf+'</td><td>'+r.ga+'</td><td>'+(r.gf-r.ga)+'</td></tr>').join('')+'</tbody></table></div>';
+   const p=competition.uruguayAccess;
+   content='<div class="table-legend"><span class="legend-item access">Verde · 1º e 2º (acesso direto) e vencedor do playoff</span><span class="legend-item playoff">Amarelo · 3º ao 6º enquanto disputa o playoff</span></div><div class="table-wrap"><table class="standings"><thead><tr><th>#</th><th>Clube</th><th>P</th><th>J</th><th>V</th><th>E</th><th>D</th><th>GP</th><th>GC</th><th>SG</th></tr></thead><tbody>'+standings.map((r,i)=>'<tr class="'+(i<2||p?.promotedThird===r.id?'zone-access':i<6?'zone-playoff':'')+'"><td>'+(i+1)+'</td><td class="team-name">'+clubLink(r.club,r.club.name)+'</td><td>'+r.points+'</td><td>'+r.played+'</td><td>'+r.wins+'</td><td>'+r.draws+'</td><td>'+r.losses+'</td><td>'+r.gf+'</td><td>'+r.ga+'</td><td>'+(r.gf-r.ga)+'</td></tr>').join('')+'</tbody></table></div>';
   }
   else content='<div class="table-legend">'+(competition.division==='A'?'<span class="legend-item relegation">Rebaixamento · 17º ao 20º</span>':'<span class="legend-item access">Acesso direto · 1º e 2º</span><span class="legend-item playoff">Playoffs · 3º ao 6º</span>')+'</div><div class="table-wrap"><table class="standings"><thead><tr><th>#</th><th>Clube</th><th>P</th><th>J</th><th>V</th><th>E</th><th>D</th><th>GP</th><th>GC</th><th>SG</th></tr></thead><tbody>'+standings.map((r,i)=>{const rank=i+1,winner=competition.playoffs?.ties?.some(t=>playoffWinner(t)===r.id);const zone=competition.division==='A'?(rank>=17?'zone-relegation':''):(rank<=2||winner?'zone-access':rank<=6?'zone-playoff':'');return '<tr class="'+zone+'"><td>'+rank+'</td><td class="team-name">'+clubLink(r.club,r.club.name)+'</td><td>'+r.points+'</td><td>'+r.played+'</td><td>'+r.wins+'</td><td>'+r.draws+'</td><td>'+r.losses+'</td><td>'+r.gf+'</td><td>'+r.ga+'</td><td>'+(r.gf-r.ga)+'</td></tr>';}).join('')+'</tbody></table></div>'+(competition.division==='B'&&competition.playoffs?'<p class="muted">Os vencedores do mata-mata aparecem em verde: acesso garantido.</p>':'');
  }else if(section==='games'){
