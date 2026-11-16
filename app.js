@@ -664,7 +664,7 @@ function advanceCountrySeason(country,sourceSeasonId){
   const first=sourceComps.find(c=>c.chileDivision==='Primera División'),second=sourceComps.find(c=>c.chileDivision==='Primera B');
   if(first&&second){
    const firstRows=getStandings(first),secondRows=getStandings(second);
-   const relegated=firstRows.slice(-2).map(r=>r.id),promoted=[secondRows[0]?.id,second.chilePlayoffs?.promoted].filter(Boolean);
+   const relegated=firstRows.slice(-2).map(r=>r.id),promoted=[chileTitleWinner(second.chileTitleTie)||secondRows[0]?.id,second.chilePlayoffs?.promoted].filter(Boolean);
    if(promoted.length!==2||relegated.length!==2){alert('Não foi possível definir os dois acessos e os dois rebaixamentos do Chile.');return;}
    nextParticipants.set(first.id,[...first.participants.filter(id=>!relegated.includes(id)),...promoted]);
    // A Primera B mantém 16 participantes: os dois promovidos saem e os dois rebaixados da elite entram.
