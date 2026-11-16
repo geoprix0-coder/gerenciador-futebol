@@ -170,7 +170,7 @@ function renderSelections(tab=activeSelectionTab){
   const list=activeSelectionConfederation==='Todas'?ranked:ranked.filter(t=>t.confederation===activeSelectionConfederation);
   content+='<div class="panel"><div class="panel-head"><div><h3>Classificação mundial</h3><p class="muted">Todas as seleções começaram com 1.000 pontos. Empates de pontuação compartilham a mesma posição.</p></div><select id="selection-confederation"><option>Todas</option>'+Object.keys(CONFEDERATION_NAMES).map(c=>'<option value="'+c+'" '+(activeSelectionConfederation===c?'selected':'')+'>'+CONFEDERATION_NAMES[c]+'</option>').join('')+'</select></div>'+selectionRankingTable(list)+'</div>';
  }else if(tab==='teams'){
-  content+='<div class="panel"><div class="panel-head"><div><h3>Diretório de seleções</h3><p class="muted">Cadastro das 211 associações, com bandeira, sigla e confederação.</p></div><input id="selection-search" placeholder="Buscar seleção..." aria-label="Buscar seleção"></div><div class="selection-confed-filter">'+['Todas',...Object.keys(CONFEDERATION_NAMES)].map(c=>'<button class="filter-chip '+(activeSelectionConfederation===c?'active':'')+'" data-team-confed="'+c+'">'+(c==='Todas'?'Todas':c)+'</button>').join('')+'</div><div id="selection-team-table">'+selectionTeamTable(nationalTeams)+'</div></div>';
+  content+='<div class="panel"><div class="panel-head"><div><h3>Diretório de seleções</h3><p class="muted">Cadastro das 211 associações, com bandeira, sigla e confederação.</p></div><input id="selection-search" placeholder="Buscar seleção..." aria-label="Buscar seleção"></div><div class="selection-confed-filter">'+['Todas',...Object.keys(CONFEDERATION_NAMES)].map(c=>'<button class="filter-chip '+(activeSelectionConfederation===c?'active':'')+'" data-team-confed="'+c+'">'+(c==='Todas'?'Todas':c)+'</button>').join('')+'</div><div id="selection-team-table">'+selectionTeamTable(activeSelectionConfederation==='Todas'?nationalTeams:nationalTeams.filter(t=>t.confederation===activeSelectionConfederation))+'</div></div>';
  }else if(tab==='matches'){
   const sortedTeams=nationalTeams.slice().sort((a,b)=>a.name.localeCompare(b.name,'pt-BR'));
   const teamOptions=sortedTeams.map(t=>'<option value="'+t.id+'">'+flagEmoji(t.iso)+' '+esc(t.name)+'</option>').join('');
@@ -192,7 +192,7 @@ function selectionRankingTable(list){
  return '<div class="table-wrap"><table class="standings selection-ranking"><thead><tr><th>POS.</th><th>SELEÇÃO</th><th>CONFEDERAÇÃO</th><th>PONTOS</th><th>JOGOS</th></tr></thead><tbody>'+list.map(t=>'<tr><td>'+t.rank+'º</td><td class="team-name">'+flagEmoji(t.iso)+' '+esc(t.name)+'</td><td>'+t.confederation+'</td><td><strong>'+Number(t.points).toFixed(2).replace(/\.00$/,'')+'</strong></td><td>'+Number(t.matches||0)+'</td></tr>').join('')+'</tbody></table></div>';
 }
 function selectionTeamTable(list){
- const sorted=[...list].sort((a,b)=>a.name.localeCompare(b.name,'pt-BR'));
+ const sorted=[...list].sort((a,b)=>Number(b.points||0)-Number(a.points||0)||a.name.localeCompare(b.name,'pt-BR'));
  return '<div class="table-wrap"><table class="standings selection-ranking"><thead><tr><th>SELEÇÃO</th><th>CÓDIGO ISO</th><th>CONFEDERAÇÃO</th><th>PONTOS</th></tr></thead><tbody>'+sorted.map(t=>'<tr><td class="team-name">'+flagEmoji(t.iso)+' '+esc(t.name)+'</td><td>'+t.iso+'</td><td>'+t.confederation+'</td><td>'+Number(t.points).toFixed(2).replace(/\.00$/,'')+'</td></tr>').join('')+'</tbody></table></div>';
 }
 
