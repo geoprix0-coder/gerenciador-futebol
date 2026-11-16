@@ -540,7 +540,7 @@ function resetTestMatches(){
  seasons=seasons.filter(s=>s.year===2026);
  seasons.forEach(s=>{
   delete s.countryAdvancements;
-  s.competitions.forEach(c=>{delete c.rounds;delete c.playoffs;delete c.chilePlayoffs;delete c.chileTitleTie;delete c.peruPlayoffs;delete c.peruFinalGroups;delete c.peruBonus;delete c.peruRegionalRounds;delete c.peruFinalRounds;if(c.peruDivision==='Liga 2')c.peruStage='regional';if(c.peruDivision==='Liga 2')c.peruStage='regional';});
+  s.competitions.forEach(c=>{delete c.rounds;delete c.playoffs;delete c.chilePlayoffs;delete c.chileTitleTie;delete c.peruPlayoffs;delete c.peruFinalGroups;delete c.peruBonus;delete c.peruRegionalRounds;delete c.peruFinalRounds;if(c.peruDivision==='Liga 2')c.peruStage='regional';});
   s.status='Preparação';
  });
  clubs.forEach(club=>{initializeClubRating(club);club.overall=club.initialRating.overall;club.attack=club.initialRating.attack;club.defense=club.initialRating.defense;});
