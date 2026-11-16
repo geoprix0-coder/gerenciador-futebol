@@ -325,7 +325,7 @@ function renderCompetitions(){
  view.querySelectorAll('[data-country-season]').forEach(select=>select.addEventListener('change',()=>{
   const season=seasons.find(s=>s.id===select.value);if(!season)return;
   const country=select.dataset.countrySeason,section=select.closest('.country-group');
-  const primera=list.filter(c=>c.argentinaType==='primera'),uruguayFirst=list.filter(c=>['primera-apertura','intermedio','intermedio-serie','primera-clausura'].includes(c.uruguayType)),uruguaySecond=list.filter(c=>['competencia-serie','segunda-regular'].includes(c.uruguayType));
+  const primera=list.filter(c=>c.argentinaType==='primera'),uruguayFirst=list.filter(c=>['primera-apertura','intermedio','intermedio-serie','primera-clausura'].includes(c.uruguayType)),uruguaySecond=list.filter(c=>['competencia','competencia-serie','segunda-regular'].includes(c.uruguayType));
   let html='';
   if(primera.length)html+='<button class="competition-open" data-open-competition="'+season.id+'|'+primera[0].id+'"><span><strong>Primera División</strong><small>Apertura e Clausura · '+primera[0].participants.length+' participantes</small></span><span class="competition-open-action">Abrir campeonato →</span></button>';
   if(uruguayFirst.length)html+='<button class="competition-open" data-open-competition="'+season.id+'|'+uruguayFirst[0].id+'"><span><strong>Primera División · Uruguai</strong><small>Apertura, Intermedio e Clausura · 16 clubes</small></span><span class="competition-open-action">Abrir campeonato →</span></button>';
