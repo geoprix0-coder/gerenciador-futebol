@@ -125,6 +125,32 @@ function migrateUruguayCompetenciaCompetition(){
  if(season.competitions.some(c=>c.uruguayType==='competencia')||(!a&&!b))return;const zones={A:[...(a?.participants||[])],B:[...(b?.participants||[])]},ra=a?.rounds||[],rb=b?.rounds||[];
  const rounds=Array.from({length:Math.max(ra.length,rb.length)},(_,i)=>({number:i+1,matches:[...(ra[i]?.matches||[]),...(rb[i]?.matches||[])]}));const merged={...(a||b),id:'uru-segunda-competencia-2026',name:'Torneo Competencia',division:'Segunda División Profesional',format:'2026 · séries A e B de 7 clubes · 7 rodadas · final entre os líderes',uruguayType:'competencia',zones,participants:[...zones.A,...zones.B],rounds};season.competitions=season.competitions.filter(c=>c!==a&&c!==b);season.competitions.push(merged);
 }
+const COLOMBIA_PRIMERA_2026=[
+ ['Águilas Doradas','Antioquia'],['Alianza FC','Cesar'],['América de Cali','Valle del Cauca'],['Deportivo Pasto','Nariño'],
+ ['Atlético Bucaramanga','Santander'],['Atlético Nacional','Antioquia'],['Boyacá Chicó','Boyacá'],['Cúcuta Deportivo','Norte de Santander'],
+ ['Deportivo Cali','Valle del Cauca'],['Independiente Medellín','Antioquia'],['Deportivo Pereira','Risaralda'],['Deportes Tolima','Tolima'],
+ ['Fortaleza CEIF','Bogotá D.C.'],['Independiente Santa Fe','Bogotá D.C.'],['Internacional de Bogotá','Bogotá D.C.'],['Jaguares de Córdoba','Córdoba'],
+ ['Junior','Atlántico'],['Llaneros FC','Meta'],['Millonarios','Bogotá D.C.'],['Once Caldas','Caldas']
+];
+const COLOMBIA_SEGUNDA_2026=[
+ ['Atlético FC','Valle del Cauca'],['Barranquilla FC','Atlántico'],['Boca Juniors de Cali','Valle del Cauca'],['Bogotá FC','Bogotá D.C.'],
+ ['Deportes Quindío','Quindío'],['Envigado FC','Antioquia'],['Independiente Yumbo','Valle del Cauca'],['Internacional FC Palmira','Valle del Cauca'],
+ ['Leones FC','Antioquia'],['Orsomarso SC','Valle del Cauca'],['Patriotas Boyacá','Boyacá'],['Real Cartagena','Bolívar'],
+ ['Real Cundinamarca','Cundinamarca'],['Real Santander','Santander'],['Tigres FC','Bogotá D.C.'],['Unión Magdalena','Magdalena']
+];
+function ensureColombia2026(){
+ const existing=seasons.find(s=>s.year===2026);if(!existing||existing.competitions.some(c=>c.country==='Colômbia'))return;
+ const findOrAdd=(name,department)=>{let club=clubs.find(c=>slugify(c.name)===slugify(name));if(!club){club={id:uid(),name,state:department||'',slug:slugify(name)};initializeClubRating(club);clubs.push(club);}return club.id;};
+ const ids=list=>list.map(([name,department])=>findOrAdd(name,department));
+ const primera=ids(COLOMBIA_PRIMERA_2026),segunda=ids(COLOMBIA_SEGUNDA_2026);
+ const make=(id,name,division,format,participants,colombiaType)=>({id,name,country:'Colômbia',division,format,participants,singleRound:true,colombiaType});
+ existing.competitions.push(
+  make('col-primera-apertura-2026','Liga BetPlay · Apertura','Primera División','2026 · 20 clubes · 19 rodadas · turno único',primera,'primera-apertura'),
+  make('col-primera-clausura-2026','Liga BetPlay · Clausura','Primera División','2026 · 20 clubes · 19 rodadas · turno único · mandos invertidos',primera,'primera-clausura'),
+  make('col-segunda-apertura-2026','Torneo BetPlay · Apertura','Segunda División','2026 · 16 clubes · 15 rodadas · turno único',segunda,'segunda-apertura'),
+  make('col-segunda-clausura-2026','Torneo BetPlay · Clausura','Segunda División','2026 · 16 clubes · 15 rodadas · turno único · mandos invertidos',segunda,'segunda-clausura')
+ );
+}
 function ensureArgentina2026(){
  const findOrAdd=name=>{let club=clubs.find(c=>slugify(c.name)===slugify(name));if(!club){club={id:uid(),name,state:'',slug:slugify(name)};initializeClubRating(club);clubs.push(club);}return club.id;};
  const ids=names=>names.map(findOrAdd);
@@ -141,6 +167,7 @@ function ensureArgentina2026(){
 }
 ensureArgentina2026();
 ensureUruguay2026();
+ensureColombia2026();
 migrateUruguayIntermedioCompetition();
 migrateUruguayCompetenciaCompetition();
 seasons.forEach(season=>season.competitions.forEach(competition=>{if(!competition.country)competition.country='Brasil';}));
