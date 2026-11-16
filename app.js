@@ -222,7 +222,7 @@ function colombiaPromediosTable(year){
    const total=totals.get(id);total.points+=row.points;total.played+=row.played;
   }));
  });
- const rows=[...totals.values()].map(r=>({...r,average:r.played?r.points/r.played:null})).filter(r=>r.played>0);
+ const rows=[...totals.values()].map(r=>({...r,average:r.played?r.points/r.played:0}));
  rows.sort((a,b)=>a.average-b.average||a.points-b.points||getClub(a.id).name.localeCompare(getClub(b.id).name,'pt-BR'));
  return {years,rows};
 }
