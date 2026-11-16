@@ -501,7 +501,7 @@ function ensureEcuador2026(){
 }
 function ecuadorDoubleRoundRobin(ids){const teams=[...ids];if(teams.length%2)teams.push(null);const n=teams.length,half=n/2,one=[];for(let r=0;r<n-1;r++){const matches=[];for(let i=0;i<half;i++){const x=teams[i],y=teams[n-1-i];if(x&&y){const home=(r+i)%2===0?x:y;matches.push({home,away:home===x?y:x,homeGoals:null,awayGoals:null});}}one.push(matches);teams.splice(1,0,teams.pop());}return one.concat(one.map(ms=>ms.map(m=>({home:m.away,away:m.home,homeGoals:null,awayGoals:null}))));}
 function ecuadorStageTable(c,ids){
- const base=getStandings({...c,participants:c.participants,rounds:c.ecuadorRegularRounds||[]}),final=getStandings({...c,participants:ids,rounds:c.ecuadorFinalRounds||[]}),map=new Map(base.map(r=>[r.id,{...r}]));
+ const base=getStandings({...c,participants:c.participants,rounds:c.ecuadorRegularRounds||[]}),final=getStandings({...c,participants:ids,rounds:c.rounds||c.ecuadorFinalRounds||[]}),map=new Map(base.map(r=>[r.id,{...r}]));
  final.forEach(r=>{const x=map.get(r.id);if(x)['points','played','wins','draws','losses','gf','ga'].forEach(k=>x[k]+=r[k]);});
  return ids.map(id=>map.get(id)).filter(Boolean).sort((a,b)=>b.points-a.points||(b.gf-b.ga)-(a.gf-a.ga)||b.gf-a.gf||getClub(a.id).name.localeCompare(getClub(b.id).name,'pt-BR'));
 }
