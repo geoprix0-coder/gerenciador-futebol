@@ -36,7 +36,7 @@ function getClub(id){return clubs.find(c=>c.id===id);}
 function randomInt(min,max){return Math.floor(Math.random()*(max-min+1))+min;}
 function boundedRating(value){return Math.max(1,Math.min(100,Math.round(value)));}
 function initializeClubRating(club){
- if(club.initialRating&&Number.isFinite(club.initialRating.overall)){club.overall=club.initialRating.overall;club.attack=club.initialRating.attack;club.defense=club.initialRating.defense;return;}
+ if(club.initialRating&&Number.isFinite(club.initialRating.overall))return;
  const overall=Number.isFinite(club.overall)?boundedRating(club.overall):randomInt(48,84);
  const attack=Number.isFinite(club.attack)?boundedRating(club.attack):boundedRating(overall+randomInt(-9,9));
  const defense=Number.isFinite(club.defense)?boundedRating(club.defense):boundedRating(overall+randomInt(-9,9));
