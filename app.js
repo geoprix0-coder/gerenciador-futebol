@@ -837,7 +837,37 @@ function advanceCountrySeason(country,sourceSeasonId){
  save();renderCompetitions();
  alert(country==='Brasil'&&divisions.A&&divisions.B?'Temporada '+nextYear+' criada! Os quatro últimos da Série A foram rebaixados, e os quatro promovidos da Série B foram definidos. As forças acumuladas dos clubes foram preservadas.':country==='Colômbia'?'Temporada '+nextYear+' criada! Promovidos à Primera División: '+(colombiaPromotionStatus(sourceComps.find(c=>c.colombiaDivision==='Segunda División'))?.promoted||[]).map(id=>getClub(id)?.name||'').join(' e ')+'. Os rebaixados também foram substituídos, e as forças dos clubes foram preservadas.':'Temporada '+nextYear+' criada! Os participantes e as forças acumuladas dos clubes foram preservados.');
 }
+function repairLegacyVenezuelaAdvance(){
+ let changed=false;
+ seasons.forEach(source=>{
+  const nextYear=source.countryAdvancements?.Venezuela,target=seasons.find(x=>x.year===nextYear);
+  if(!nextYear||!target)return;
+  const sourceComps=source.competitions.filter(c=>c.country==='Venezuela'),targetComps=target.competitions.filter(c=>c.country==='Venezuela');
+  if(sourceComps.length!==3||targetComps.length!==3||!targetComps.every(c=>!(c.rounds||[]).length))return;
+  const ap=sourceComps.find(c=>c.venezuelaPhase==='Apertura'),cl=sourceComps.find(c=>c.venezuelaPhase==='Clausura'),second=sourceComps.find(c=>c.venezuelaDivision==='Segunda División');
+  const annual=venezuelaAnnualTable(source.year),relegated=annual.slice(-1).map(r=>r.id),promoted=second?.venezuelaKnockout?.champion;
+  if(!ap||!cl||!second||annual.length!==14||annual.some(r=>r.played!==26)||!ap.venezuelaTitleFinal?.completed||!cl.venezuelaTitleFinal?.completed||!promoted||relegated.length!==1)return;
+  const zones={A:[...(second.zones?.A||[])],B:[...(second.zones?.B||[])]},promotedZone=Object.keys(zones).find(z=>zones[z].includes(promoted));
+  if(!promotedZone)return;
+  zones[promotedZone][zones[promotedZone].indexOf(promoted)]=relegated[0];
+  const participants=new Map(sourceComps.map(c=>[c.id,[...c.participants]])),nextZones=new Map();
+  [ap,cl].forEach(c=>participants.set(c.id,[...c.participants.filter(id=>id!==relegated[0]),promoted]));
+  participants.set(second.id,[...zones.A,...zones.B]);nextZones.set(second.id,zones);
+  const resetFields=new Set(['rounds','playoffs','venezuelaStage','venezuelaRegularRounds','venezuelaFinalRounds','venezuelaRegionalRounds','venezuelaGroups','venezuelaGroupWinners','venezuelaTitleFinal','venezuelaKnockout','venezuelaQualified']);
+  const rebuilt=sourceComps.map(comp=>{
+   const previous=targetComps.find(c=>c.venezuelaDivision===comp.venezuelaDivision&&(c.venezuelaPhase||'')===(comp.venezuelaPhase||''));
+   const next={...Object.fromEntries(Object.entries(comp).filter(([k])=>!resetFields.has(k))),id:previous?.id||uid(),participants:participants.get(comp.id)||[...comp.participants],...(nextZones.has(comp.id)?{zones:nextZones.get(comp.id)}:{})};
+   buildSchedule(next);return next;
+  });
+  const firstIndex=target.competitions.findIndex(c=>c.country==='Venezuela');
+  target.competitions=target.competitions.filter(c=>c.country!=='Venezuela');
+  target.competitions.splice(firstIndex<0?target.competitions.length:Math.min(firstIndex,target.competitions.length),0,...rebuilt);
+  changed=true;
+ });
+ if(changed)save();
+}
 function renderCompetitions(){
+  repairLegacyVenezuelaAdvance();
   const countries=[...new Set(seasons.flatMap(s=>s.competitions.map(c=>c.country||'Brasil')))].sort((a,b)=>a.localeCompare(b,'pt-BR'));
   function countryBody(country,season){
    if(!season)return '<div class="empty">Nenhuma competição nesta temporada.</div>';
