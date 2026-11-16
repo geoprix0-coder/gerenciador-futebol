@@ -1391,7 +1391,7 @@ function renderCompetitionDetail(seasonId,competitionId,section='table'){
  const season=seasons.find(s=>s.id===seasonId),competition=season?.competitions.find(c=>c.id===competitionId);if(!season||!competition)return renderCompetitions();
  if(competition.chileDivision==='Primera B')competition.chileStageView=competition.chileStageView||'regular';if(competition.ecuadorDivision)competition.ecuadorStage=competition.ecuadorStage||'regular';if(competition.peruDivision==='Liga 2')competition.peruStage=competition.peruStage||'regional';if(competition.venezuelaDivision==='Primera División')competition.venezuelaStage=competition.venezuelaStage||'regular';if(competition.venezuelaDivision==='Segunda División')competition.venezuelaStage=competition.venezuelaStage||'regional';
  const participants=competition.participants.map(getClub).filter(Boolean).sort((a,b)=>a.name.localeCompare(b.name,'pt-BR'));
- if(section==='games'&&!competition.rounds?.length&&participants.length>=2&&!competition.venezuelaDivision&&(!competition.peruDivision||competition.peruDivision==='Primera División'||competition.peruStage==='regional')){buildSchedule(competition);save();}
+ if(section==='games'&&!competition.rounds?.length&&participants.length>=2&&(!competition.venezuelaDivision||competition.venezuelaDivision==='Primera División'&&competition.venezuelaStage==='regular'||competition.venezuelaDivision==='Segunda División'&&competition.venezuelaStage==='regional')&&(!competition.peruDivision||competition.peruDivision==='Primera División'||competition.peruStage==='regional')){buildSchedule(competition);save();}
  const tabs=[['table','Classificação'],['games','Jogos'],['clubs','Clubes']];
  let content='';
  if(section==='table'){
