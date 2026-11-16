@@ -504,11 +504,15 @@ function uruguayCreateAccessPlayoffs(competition){
 function uruguayEnsureAccessPlayoffs(competition){
  const p=competition?.uruguayAccess;if(!p)return false;
  const s=getStandings(competition);if(s.length<6)return false;
- const expected=s.slice(0,6).map(r=>r.id),saved=p.seedTable||[...(p.promotedDirect||[]),p.semifinals?.[0]?.teamA,p.semifinals?.[1]?.teamA,p.semifinals?.[1]?.teamB,p.semifinals?.[0]?.teamB].filter(Boolean);
- const same=(a,b)=>a.length===b.length&&a.every((id,i)=>id===b[i]);
- if(same(expected,saved))return false;
- const played=[...(p.semifinals||[]),...(p.final?[p.final]:[])].some(t=>(t.legs||[]).some(m=>m.homeGoals!==null||m.awayGoals!==null));
- if(played||p.completed)return false;
+ const ids=s.slice(0,6).map(r=>r.id),same=(a,b)=>Array.isArray(a)&&a.length===b.length&&a.every((id,i)=>id===b[i]);
+ const expected=[
+  [ids[2],ids[5]],
+  [ids[3],ids[4]]
+ ];
+ const tieValid=(tie,pair)=>!!tie&&tie.teamA===pair[0]&&tie.teamB===pair[1]&&Array.isArray(tie.legs)&&tie.legs.length===2&&tie.legs[0].home===pair[1]&&tie.legs[0].away===pair[0]&&tie.legs[1].home===pair[0]&&tie.legs[1].away===pair[1];
+ const valid=same(p.promotedDirect,ids.slice(0,2))&&same(p.seedTable,ids)&&Array.isArray(p.semifinals)&&p.semifinals.length===2&&tieValid(p.semifinals[0],expected[0])&&tieValid(p.semifinals[1],expected[1]);
+ if(valid)return false;
+ // O chaveamento antigo não corresponde à classificação atual: recria somente o playoff.
  return uruguayCreateAccessPlayoffs(competition);
 }
 function uruguayAccessWinner(t){
@@ -847,7 +851,7 @@ function renderCompetitionDetail(seasonId,competitionId,section='table'){
   else if(competition.uruguayType==='segunda-regular'){
    if(competition.uruguayAccess)uruguayEnsureAccessPlayoffs(competition);
    const p=competition.uruguayAccess;
-   content='<div class="table-legend"><span class="legend-item access">Verde · 1º e 2º (acesso direto) e vencedor do playoff</span><span class="legend-item playoff">Amarelo · 3º ao 6º enquanto disputa o playoff</span></div><div class="table-wrap"><table class="standings"><thead><tr><th>#</th><th>Clube</th><th>P</th><th>J</th><th>V</th><th>E</th><th>D</th><th>GP</th><th>GC</th><th>SG</th></tr></thead><tbody>'+standings.map((r,i)=>'<tr class="'+(i<2||p?.promotedThird===r.id?'zone-access':i<6?'zone-playoff':'')+'"><td>'+(i+1)+'</td><td class="team-name">'+clubLink(r.club,r.club.name)+'</td><td>'+r.points+'</td><td>'+r.played+'</td><td>'+r.wins+'</td><td>'+r.draws+'</td><td>'+r.losses+'</td><td>'+r.gf+'</td><td>'+r.ga+'</td><td>'+(r.gf-r.ga)+'</td></tr>').join('')+'</tbody></table></div>';
+   content='<div class="table-legend"><span class="legend-item access">Verde · 1º e 2º (acesso direto) e vencedor do playoff</span><span class="legend-item playoff">Amarelo · 3º ao 6º enquanto disputa o playoff</span></div><div class="table-wrap"><table class="standings"><thead><tr><th>#</th><th>Clube</th><th>P</th><th>J</th><th>V</th><th>E</th><th>D</th><th>GP</th><th>GC</th><th>SG</th></tr></thead><tbody>'+standings.map((r,i)=>'<tr class="'+(i<2||(p?.completed&&p.promotedThird===r.id)?'zone-access':i<6?'zone-playoff':'')+'"><td>'+(i+1)+'</td><td class="team-name">'+clubLink(r.club,r.club.name)+'</td><td>'+r.points+'</td><td>'+r.played+'</td><td>'+r.wins+'</td><td>'+r.draws+'</td><td>'+r.losses+'</td><td>'+r.gf+'</td><td>'+r.ga+'</td><td>'+(r.gf-r.ga)+'</td></tr>').join('')+'</tbody></table></div>';
   }
   else content='<div class="table-legend">'+(competition.division==='A'?'<span class="legend-item relegation">Rebaixamento · 17º ao 20º</span>':'<span class="legend-item access">Acesso direto · 1º e 2º</span><span class="legend-item playoff">Playoffs · 3º ao 6º</span>')+'</div><div class="table-wrap"><table class="standings"><thead><tr><th>#</th><th>Clube</th><th>P</th><th>J</th><th>V</th><th>E</th><th>D</th><th>GP</th><th>GC</th><th>SG</th></tr></thead><tbody>'+standings.map((r,i)=>{const rank=i+1,winner=competition.playoffs?.ties?.some(t=>playoffWinner(t)===r.id);const zone=competition.division==='A'?(rank>=17?'zone-relegation':''):(rank<=2||winner?'zone-access':rank<=6?'zone-playoff':'');return '<tr class="'+zone+'"><td>'+rank+'</td><td class="team-name">'+clubLink(r.club,r.club.name)+'</td><td>'+r.points+'</td><td>'+r.played+'</td><td>'+r.wins+'</td><td>'+r.draws+'</td><td>'+r.losses+'</td><td>'+r.gf+'</td><td>'+r.ga+'</td><td>'+(r.gf-r.ga)+'</td></tr>';}).join('')+'</tbody></table></div>'+(competition.division==='B'&&competition.playoffs?'<p class="muted">Os vencedores do mata-mata aparecem em verde: acesso garantido.</p>':'');
  }else if(section==='games'){
