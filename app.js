@@ -92,9 +92,9 @@ const MATCH_IMPORTANCE=[
  {id:'nations_group',label:'Liga das Nações · fase de grupos',weight:15},
  {id:'nations_final',label:'Liga das Nações · finais/playoffs',weight:25},
  {id:'qualifiers',label:'Eliminatórias continentais ou da Copa do Mundo',weight:25},
- {id:'continental_group',label:'Torneio continental · até as quartas',weight:35},
+ {id:'continental_group',label:'Torneio continental · grupos/oitavas (antes das quartas)',weight:35},
  {id:'continental_qf',label:'Torneio continental · quartas em diante',weight:40,protectKnockout:true},
- {id:'worldcup_group',label:'Copa do Mundo · grupos/oitavas',weight:50},
+ {id:'worldcup_group',label:'Copa do Mundo · grupos/oitavas (antes das quartas)',weight:50},
  {id:'worldcup_qf',label:'Copa do Mundo · quartas em diante',weight:60,protectKnockout:true}
 ];
 const INTERNATIONAL_COMPETITIONS=[
