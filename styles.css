@@ -130,3 +130,33 @@
 .standings tr.zone-sudamericana{background:rgba(63,132,226,.20);box-shadow:inset 4px 0 #5799ed}
 .legend-item.libertadores{background:rgba(36,184,125,.20);color:#67e1ac}
 .legend-item.sudamericana{background:rgba(63,132,226,.20);color:#83b5ff}
+
+
+/* WFS national teams and international ranking */
+.selection-hero{display:flex;justify-content:space-between;align-items:center;gap:20px;padding:26px 28px;margin-bottom:18px;border:1px solid #29485f;border-radius:15px;background:linear-gradient(115deg,#15384a,#17263e 68%,#20314d)}
+.selection-hero .eyebrow{color:var(--accent)}
+.selection-hero h2{font:800 23px Manrope;margin:8px 0}
+.selection-hero p{margin:0;color:var(--muted);font-size:12px}
+.selection-total{min-width:95px;text-align:center;padding:13px 18px;border:1px solid #416178;border-radius:12px;background:#102638}
+.selection-total strong,.selection-total span{display:block}
+.selection-total strong{font:800 30px Manrope;color:var(--accent)}
+.selection-total span{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:1px}
+.selection-tabs{display:flex;gap:6px;overflow-x:auto;border-bottom:1px solid var(--line);margin:18px 0}
+.selection-tab{flex-shrink:0;padding:12px 15px;border:0;border-bottom:2px solid transparent;background:transparent;color:var(--muted);font:600 12px 'DM Sans';cursor:pointer}
+.selection-tab.active{color:var(--accent);border-bottom-color:var(--accent)}
+.selection-ranking{min-width:650px}
+.selection-ranking td,.selection-ranking th{padding:11px 12px}
+.selection-ranking td.team-name{min-width:180px}
+.selection-ranking tbody tr:hover{background:rgba(109,168,255,.06)}
+.selection-confed-filter{display:flex;gap:7px;flex-wrap:wrap;margin:10px 0 16px}
+.filter-chip{border:1px solid var(--line);border-radius:20px;background:var(--panel2);color:var(--muted);padding:7px 11px;font:600 10px 'DM Sans';cursor:pointer}
+.filter-chip.active{background:#17392f;border-color:#2b6a54;color:var(--accent)}
+.selection-match-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.selection-match-grid .field{margin:8px 0}
+.selection-match-grid .field select,.selection-match-grid .field input{width:100%;min-width:0}
+.selection-match-table{min-width:680px}
+.points-up{color:#65dda0;font-weight:700}
+.points-down{color:#ff929a;font-weight:700}
+#selection-search{max-width:230px}
+@media(max-width:800px){.selection-match-grid{grid-template-columns:1fr 1fr}.selection-hero{align-items:flex-start;padding:20px;flex-direction:column}.selection-total{align-self:flex-end;margin-top:-4px}}
+@media(max-width:520px){.selection-match-grid{grid-template-columns:1fr}#selection-search{max-width:none;width:100%}}
