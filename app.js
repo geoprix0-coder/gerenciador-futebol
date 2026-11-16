@@ -168,7 +168,7 @@ function advanceCountrySeason(country,sourceSeasonId){
  const sourceComps=source.competitions.filter(c=>(c.country||'Brasil')===country);
  const divisions={A:sourceComps.find(c=>c.division==='A'),B:sourceComps.find(c=>c.division==='B')};
  const nextParticipants=new Map(sourceComps.map(c=>[c.id,[...c.participants]]));
- if(country==='Argentina'){const first=sourceComps.find(c=>c.argentinaType==='primera'),second=sourceComps.find(c=>c.argentinaType==='nacional');if(first&&second){const decision=argentinaRelegationDecision(source.year);if(!decision.ready){alert(decision.reason);return;}const relegated=decision.relegated;const promoted=['A','B'].map(z=>argentinaZoneStandings(second,z)[0]?.id).filter(Boolean);const allA=[...first.participants.filter(id=>!relegated.includes(id)),...promoted];sourceComps.filter(c=>c.argentinaType==='primera').forEach(c=>nextParticipants.set(c.id,[...allA]));nextParticipants.set(second.id,[...second.participants.filter(id=>!promoted.includes(id)),...relegated]);}}
+ if(country==='Argentina'){const first=sourceComps.find(c=>c.argentinaType==='primera'),second=sourceComps.find(c=>c.argentinaType==='nacional');if(first&&second){const decision=argentinaRelegationDecision(source.year);if(!decision.ready){alert(decision.reason);return;}const promoted=[second.argentinaPlayoffs?.promotedDirect,second.argentinaPlayoffs?.promotedReduced].filter(Boolean);if(promoted.length!==2){alert('O mata-mata da Primera Nacional ainda não definiu os dois clubes promovidos.');return;}const relegated=decision.relegated;const allA=[...first.participants.filter(id=>!relegated.includes(id)),...promoted];sourceComps.filter(c=>c.argentinaType==='primera').forEach(c=>nextParticipants.set(c.id,[...allA]));nextParticipants.set(second.id,[...second.participants.filter(id=>!promoted.includes(id)),...relegated]);}}
  if(country==='Brasil'&&divisions.A&&divisions.B){
   const relegated=getStandings(divisions.A).slice(-4).map(r=>r.id);
   const bStandings=getStandings(divisions.B);
@@ -187,7 +187,7 @@ function advanceCountrySeason(country,sourceSeasonId){
  source.countryAdvancements=source.countryAdvancements||{};
  source.countryAdvancements[country]=nextYear;
  sourceComps.forEach(comp=>{
-  target.competitions.push({...Object.fromEntries(Object.entries(comp).filter(([k])=>!['rounds','playoffs'].includes(k))),id:uid(),name:comp.name,country,division:comp.division||'',participants:nextParticipants.get(comp.id)||[...comp.participants],format:comp.format||'A definir'});
+  target.competitions.push({...Object.fromEntries(Object.entries(comp).filter(([k])=>!['rounds','playoffs','argentinaPlayoffs'].includes(k))),id:uid(),name:comp.name,country,division:comp.division||'',participants:nextParticipants.get(comp.id)||[...comp.participants],format:comp.format||'A definir'});
  });
  save();renderCompetitions();
  alert(country==='Brasil'&&divisions.A&&divisions.B?'Temporada '+nextYear+' criada! Os quatro últimos da Série A foram rebaixados, e os quatro promovidos da Série B foram definidos. As forças acumuladas dos clubes foram preservadas.':'Temporada '+nextYear+' criada! Os participantes e as forças acumuladas dos clubes foram preservados.');
@@ -197,7 +197,7 @@ function renderCompetitions(){
  const countrySections=countries.map(country=>{
   const current=countrySeason(country);
   const canAdvance=countrySeasonReady(country,current);
-  return '<section class="country-group"><div class="country-heading"><h2>'+esc(country)+'</h2><div class="country-heading-actions"><span class="tag">'+seasons.reduce((n,s)=>n+s.competitions.filter(c=>(c.country||'Brasil')===country).length,0)+' COMPETIÇÕES</span>'+(canAdvance?'<button class="btn country-advance" data-advance-country="'+esc(country)+'" data-source-season="'+current.id+'">Avançar para temporada seguinte →</button>':'')+'</div></div>'+[...seasons].sort((a,b)=>b.year-a.year).map(s=>{const list=s.competitions.filter(c=>(c.country||'Brasil')===country);return list.length?'<h3 class="season-heading">Temporada '+s.year+'</h3>'+list.map(c=>'<button class="competition-open" data-open-competition="'+s.id+'|'+c.id+'"><span><strong>'+esc(c.name)+'</strong><small>'+c.participants.length+' participantes · Formato: '+esc(c.format)+'</small></span><span class="competition-open-action">Abrir competição →</span></button>').join(''):'';}).join('')+'</section>';
+  return '<section class="country-group"><div class="country-heading"><h2>'+esc(country)+'</h2><div class="country-heading-actions"><span class="tag">'+seasons.reduce((n,s)=>n+s.competitions.filter(c=>(c.country||'Brasil')===country).length,0)+' COMPETIÇÕES</span>'+(canAdvance?'<button class="btn country-advance" data-advance-country="'+esc(country)+'" data-source-season="'+current.id+'">Avançar para temporada seguinte →</button>':'')+'</div></div>'+[...seasons].sort((a,b)=>b.year-a.year).map(s=>{const list=s.competitions.filter(c=>(c.country||'Brasil')===country);if(!list.length)return '';const primera=list.filter(c=>c.argentinaType==='primera');const others=list.filter(c=>c.argentinaType!=='primera');let html='<h3 class="season-heading">Temporada '+s.year+'</h3>';if(primera.length){html+='<button class="competition-open" data-open-competition="'+s.id+'|'+primera[0].id+'"><span><strong>Primera División</strong><small>Apertura e Clausura · '+primera[0].participants.length+' participantes</small></span><span class="competition-open-action">Abrir campeonato →</span></button>';}html+=others.map(c=>'<button class="competition-open" data-open-competition="'+s.id+'|'+c.id+'"><span><strong>'+esc(c.name)+'</strong><small>'+c.participants.length+' participantes · Formato: '+esc(c.format)+'</small></span><span class="competition-open-action">Abrir competição →</span></button>').join('');return html;}).join('')+'</section>';
  }).join('');
  view.innerHTML='<div class="panel"><div class="panel-head"><h3>Competições por país</h3><span class="tag">'+countries.length+' PAÍS(ES)</span></div><p class="muted">O botão de avanço aparece quando todas as partidas e fases decisivas dos campeonatos daquele país estiverem concluídas.</p>'+(countrySections||'<div class="empty">Nenhuma competição cadastrada.</div>')+'</div>';
  view.querySelectorAll('[data-open-competition]').forEach(b=>b.addEventListener('click',()=>{const [seasonId,competitionId]=b.dataset.openCompetition.split('|');renderCompetitionDetail(seasonId,competitionId);}));
@@ -315,6 +315,111 @@ function argentinaZoneStandings(competition,zone){
  }));
  return rows.sort((a,b)=>b.points-a.points||(b.gf-b.ga)-(a.gf-a.ga)||b.gf-a.gf||a.club.name.localeCompare(b.club.name,'pt-BR'));
 }
+
+function argentinaMatchWinner(tie){
+ const m=tie.match;if(!m||m.homeGoals===null||m.awayGoals===null)return null;
+ if(m.homeGoals>m.awayGoals)return tie.home;
+ if(m.awayGoals>m.homeGoals)return tie.away;
+ return tie.penaltyWinner||null;
+}
+function argentinaCreateSingleTie(home,away,name){
+ return {name,home,away,match:{home,away,homeGoals:null,awayGoals:null},penaltyWinner:null,extraTimeGoals:null};
+}
+function argentinaCreateTwoLegTie(homeSeed,awaySeed,name){
+ return {name,home:homeSeed,away:awaySeed,legs:[{home:awaySeed,away:homeSeed,homeGoals:null,awayGoals:null},{home:homeSeed,away:awaySeed,homeGoals:null,awayGoals:null}],penaltyWinner:null};
+}
+function argentinaAggregate(tie){
+ let a=0,b=0;tie.legs.forEach(m=>{if(m.homeGoals===null||m.awayGoals===null)return;if(m.home===tie.home){a+=m.homeGoals;b+=m.awayGoals;}else{b+=m.homeGoals;a+=m.awayGoals;}});return {a,b};
+}
+function argentinaTieWinner(tie){
+ if(tie.legs){if(tie.legs.some(m=>m.homeGoals===null||m.awayGoals===null))return null;const score=argentinaAggregate(tie);if(score.a>score.b)return tie.home;if(score.b>score.a)return tie.away;return tie.penaltyWinner||null;}
+ return argentinaMatchWinner(tie);
+}
+function argentinaSimulateTie(tie){
+ if(tie.legs){
+  const idx=tie.legs.findIndex(m=>m.homeGoals===null||m.awayGoals===null);if(idx<0)return;
+  const match=tie.legs[idx];simulateMatch(match);
+  if(idx===1){const score=argentinaAggregate(tie);if(score.a===score.b)tie.penaltyWinner=Math.random()<.5?tie.home:tie.away;}
+ }else if(tie.match.homeGoals===null){
+  simulateMatch(tie.match);
+  if(tie.match.homeGoals===tie.match.awayGoals){
+   tie.extraTimeGoals={home:randomInt(0,1),away:randomInt(0,1)};
+   if(tie.extraTimeGoals.home!==tie.extraTimeGoals.away){
+    if(tie.extraTimeGoals.home>tie.extraTimeGoals.away)tie.penaltyWinner=tie.home;else tie.penaltyWinner=tie.away;
+   }else tie.penaltyWinner=Math.random()<.5?tie.home:tie.away;
+  }
+ }
+}
+function argentinaRoundComplete(round){return round.ties.every(t=>!!argentinaTieWinner(t));}
+function argentinaBuildPrimeraPlayoffs(competition){
+ const a=argentinaZoneStandings(competition,'A'),b=argentinaZoneStandings(competition,'B');
+ if(a.length<8||b.length<8||a.slice(0,8).some(r=>r.played===0)||b.slice(0,8).some(r=>r.played===0))return false;
+ const ties=[];
+ for(let i=0;i<8;i++){const x=a[i],y=b[7-i],home=x.points>y.points?x.id:y.points>x.points?y.id:(i%2===0?x.id:y.id),away=home===x.id?y.id:x.id;ties.push(argentinaCreateSingleTie(home,away,'Oitavas · '+(i+1)));}
+ competition.argentinaPlayoffs={kind:'primera',rounds:[{name:'Oitavas de final',ties}],completed:false,champion:null};
+ return true;
+}
+function argentinaAdvancePrimeraRound(competition){
+ const p=competition.argentinaPlayoffs;if(!p||p.completed)return false;
+ const current=p.rounds[p.rounds.length-1];if(!argentinaRoundComplete(current))return false;
+ const winners=current.ties.map(argentinaTieWinner);
+ if(winners.length===1){p.champion=winners[0];p.completed=true;return true;}
+ const next=[];
+ for(let i=0;i<winners.length;i+=2)next.push(argentinaCreateSingleTie(winners[i],winners[i+1],['Quartas de final','Semifinais','Final'][Math.log2(16/winners.length)]||'Próxima fase'));
+ const names={8:'Quartas de final',4:'Semifinais',2:'Final'};
+ p.rounds.push({name:names[winners.length]||'Próxima fase',ties:next});
+ return true;
+}
+function argentinaNacionalCreatePlayoffs(competition){
+ const a=argentinaZoneStandings(competition,'A'),b=argentinaZoneStandings(competition,'B');
+ if(a.length<8||b.length<8||a.some(r=>r.played===0)||b.some(r=>r.played===0))return false;
+ const final=argentinaCreateSingleTie(a[0].id,b[0].id,'Final pelo primeiro acesso');
+ competition.argentinaPlayoffs={kind:'nacional',stage:'final',final,rounds:[],completed:false,promotedDirect:null,promotedReduced:null};
+ return true;
+}
+function argentinaBuildReducido(competition){
+ const p=competition.argentinaPlayoffs;if(!p||!p.final||!argentinaMatchWinner(p.final))return false;
+ const direct=argentinaMatchWinner(p.final),loser=direct===p.final.home?p.final.away:p.final.home;
+ const a=argentinaZoneStandings(competition,'A'),b=argentinaZoneStandings(competition,'B');
+ const candidates=[...a.slice(1,8),...b.slice(1,8)].map(r=>({...r,zoneRank:(r===a.find(x=>x.id===r.id)?'A':'B')})).sort((x,y)=>x.points-y.points||(x.gf-x.ga)-(y.gf-y.ga));
+ const ordered=[...candidates].sort((x,y)=>x.points-y.points||(x.gf-x.ga)-(y.gf-y.ga));
+ const ties=[];for(let i=0;i<ordered.length;i+=2){const low=ordered[i],high=ordered[i+1];if(!high)continue;ties.push(argentinaCreateSingleTie(high.id,low.id,'Primeira fase do Reducido · '+(ties.length+1)));}
+ p.promotedDirect=direct;p.finalLoser=loser;p.stage='reducido-inicial';p.rounds=[{name:'Primeira fase do Reducido',ties}];
+ return true;
+}
+function argentinaAdvanceNacionalRound(competition){
+ const p=competition.argentinaPlayoffs;if(!p)return false;
+ const current=p.rounds[p.rounds.length-1];if(!current||!argentinaRoundComplete(current))return false;
+ const winners=current.ties.map(argentinaTieWinner);
+ if(winners.length===1){p.promotedReduced=winners[0];p.completed=true;p.stage='concluido';return true;}
+ if(p.stage==='reducido-inicial'){
+  const entrants=[p.finalLoser,...winners];p.rounds.push({name:'Quartas de final do Reducido',ties:Array.from({length:4},(_,i)=>argentinaCreateSingleTie(entrants[i],entrants[7-i],'Quartas · '+(i+1)))});p.stage='reducido-quartas';
+ }else if(p.stage==='reducido-quartas'){
+  p.rounds.push({name:'Semifinais do Reducido',ties:[argentinaCreateTwoLegTie(winners[0],winners[1],'Semifinal 1'),argentinaCreateTwoLegTie(winners[2],winners[3],'Semifinal 2')]});p.stage='reducido-semis';
+ }else if(p.stage==='reducido-semis'){
+  p.rounds.push({name:'Final do Reducido',ties:[argentinaCreateTwoLegTie(winners[0],winners[1],'Final')]});p.stage='reducido-final';
+ }else if(p.stage==='reducido-final'){
+  p.promotedReduced=winners[0];p.completed=true;p.stage='concluido';
+ }
+ return true;
+}
+function argentinaRenderPlayoffs(competition){
+ const p=competition.argentinaPlayoffs;if(!p)return '';
+ const renderTie=t=>{
+  const winner=argentinaTieWinner(t);
+  if(t.legs){const score=argentinaAggregate(t);return '<div class="playoff-tie"><div class="round-title"><strong>'+esc(t.name)+'</strong><span class="tag">'+(winner?'Concluído':'Em disputa')+'</span></div>'+t.legs.map((m,i)=>'<div class="fixture"><span class="fixture-team">'+clubLink(getClub(m.home),getClub(m.home).name)+'</span><strong class="score">'+(m.homeGoals===null?'—':m.homeGoals+' × '+m.awayGoals)+'</strong><span class="fixture-team away">'+clubLink(getClub(m.away),getClub(m.away).name)+'</span><small class="leg-label">'+(i?'Volta':'Ida')+'</small></div>').join('')+'<div class="aggregate-line">Agregado: <strong>'+score.a+' × '+score.b+'</strong>'+(t.penaltyWinner?' · Decidido nos pênaltis':'')+(winner?' · '+esc(getClub(winner).name).toUpperCase():'')+'</div></div>';}
+  const m=t.match;return '<div class="playoff-tie"><div class="round-title"><strong>'+esc(t.name)+'</strong><span class="tag">'+(winner?'Concluído':'Em disputa')+'</span></div><div class="fixture"><span class="fixture-team">'+clubLink(getClub(m.home),getClub(m.home).name)+'</span><strong class="score">'+(m.homeGoals===null?'—':m.homeGoals+' × '+m.awayGoals)+'</strong><span class="fixture-team away">'+clubLink(getClub(m.away),getClub(m.away).name)+'</span></div>'+(t.extraTimeGoals?'<p class="muted">Prorrogação: '+t.extraTimeGoals.home+' × '+t.extraTimeGoals.away+(t.penaltyWinner?' · Pênaltis: '+esc(getClub(t.penaltyWinner).name)+' venceu':'')+'</p>':'')+(winner?'<p class="promoted-name">Classificado: '+esc(getClub(winner).name)+'</p>':'')+'</div>';
+ };
+ if(p.kind==='primera')return '<div class="playoff-panel"><h3>Mata-mata · '+esc(competition.phase)+'</h3><p class="muted">Oitavas, quartas, semifinais e final em jogo único. Melhor campanha tem mando; empate após a prorrogação vai aos pênaltis.</p>'+p.rounds.map(r=>'<h4 class="season-heading">'+esc(r.name)+'</h4>'+r.ties.map(renderTie).join('')).join('')+(p.completed?'<p class="access-confirmation">Campeão: '+esc(getClub(p.champion).name)+'</p>':'<button class="btn" id="simulate-argentina-knockout">Simular '+esc(p.rounds[p.rounds.length-1].name)+'</button>')+'</div>';
+ return '<div class="playoff-panel"><h3>Mata-mata · Primera Nacional</h3><p class="muted">Final pelo primeiro acesso e Reducido pelo segundo acesso.</p>'+renderTie(p.final)+'<p class="promoted-name">'+(p.promotedDirect?'Acesso direto: '+esc(getClub(p.promotedDirect).name):'')+'</p>'+p.rounds.map(r=>'<h4 class="season-heading">'+esc(r.name)+'</h4>'+r.ties.map(renderTie).join('')).join('')+(p.completed?'<p class="access-confirmation">Segundo acesso: '+esc(getClub(p.promotedReduced).name)+'</p>':'<button class="btn" id="simulate-argentina-knockout">Simular '+esc(p.stage==='final'?'final pelo acesso':p.rounds[p.rounds.length-1]?.name||'mata-mata')+'</button>')+'</div>';
+}
+function argentinaSimulateKnockout(competition){
+ const p=competition.argentinaPlayoffs;if(!p||p.completed)return;
+ if(p.kind==='primera'){const round=p.rounds[p.rounds.length-1];round.ties.forEach(argentinaSimulateTie);argentinaAdvancePrimeraRound(competition);return;}
+ if(p.stage==='final'){argentinaSimulateTie(p.final);if(argentinaMatchWinner(p.final))argentinaBuildReducido(competition);return;}
+ const round=p.rounds[p.rounds.length-1];round.ties.forEach(argentinaSimulateTie);argentinaAdvanceNacionalRound(competition);
+}
+
 function argentinaCompetitionDescription(c){
  if(c.argentinaType==='primera')return c.phase+' 2026: 2 grupos de 15; 14 jogos intrazonais, um interzonal por rodada e uma rodada interzonal adicional (16 datas). Os 8 primeiros de cada zona avançam às oitavas, em jogo único; depois quartas, semifinais e final. Empates no mata-mata: prorrogação e pênaltis.';
  return 'Primeira Nacional 2026: 2 zonas de 18, turno e returno (34 datas) mais 2 jogos interzonais (36 datas). Os líderes fazem final em jogo único pelo 1º acesso. O perdedor entra no Reducido junto aos 2º–8º de cada zona; o campeão do Reducido conquista o 2º acesso. Caem os dois últimos de cada zona.';
@@ -400,18 +505,18 @@ function renderCompetitionDetail(seasonId,competitionId,section='table'){
   if(competition.argentinaType)content='<div class="argentina-rules"><p>'+esc(argentinaCompetitionDescription(competition))+'</p></div>';
   content+=rounds.length?'<div class="round-actions"><span class="muted">Rodadas: '+rounds.length+' · Jogos concluídos: '+rounds.reduce((n,r)=>n+r.matches.filter(m=>m.homeGoals!==null).length,0)+'</span><div class="round-controls"><label for="simulate-count">Simular próximas</label><select id="simulate-count">'+[1,2,3,4,5].map(n=>'<option value="'+n+'" '+(n===5?'selected':'')+'>'+n+' rodada(s)</option>').join('')+'</select><button class="btn" id="simulate-rounds">Simular resultados</button></div></div>'+rounds.map(r=>'<div class="round-card"><div class="round-title"><strong>Rodada '+r.number+'</strong><span class="tag">'+(r.matches.every(m=>m.homeGoals!==null)?'Concluída':'Pendente')+'</span></div>'+r.matches.map(m=>'<div class="fixture"><span class="fixture-team">'+clubLink(getClub(m.home),getClub(m.home).name)+'</span><strong class="score">'+(m.homeGoals===null?'—':m.homeGoals+' × '+m.awayGoals)+'</strong><span class="fixture-team away">'+clubLink(getClub(m.away),getClub(m.away).name)+'</span></div>').join('')+'</div>').join('') :'<div class="empty">Inscreva pelo menos dois clubes para gerar as rodadas automaticamente.</div>';
   const regularDone=rounds.length>0&&rounds.every(r=>r.matches.every(m=>m.homeGoals!==null));
-  if(competition.division==='B'&&regularDone&&!competition.playoffs)content+='<div class="playoff-panel"><h3>Mata-mata do acesso</h3><p class="muted">A fase regular terminou. Os clubes em 3º, 4º, 5º e 6º disputarão duas vagas de acesso em semifinais de ida e volta.</p><button class="btn" id="create-access-playoffs">Gerar confrontos do acesso</button></div>';
+  if(competition.argentinaType&&regularDone&&!competition.argentinaPlayoffs)content+='<div class="playoff-panel"><h3>Gerar mata-mata</h3><p class="muted">'+(competition.argentinaType==='primera'?'Os oito primeiros de cada zona avançam às oitavas de final.':'Os líderes das zonas disputam a final pelo primeiro acesso; o perdedor entra no Reducido pelo segundo.')+'</p><button class="btn" id="create-argentina-playoffs">Gerar confrontos</button></div>';if(competition.argentinaPlayoffs)content+=argentinaRenderPlayoffs(competition);if(competition.division==='B'&&regularDone&&!competition.playoffs)content+='<div class="playoff-panel"><h3>Mata-mata do acesso</h3><p class="muted">A fase regular terminou. Os clubes em 3º, 4º, 5º e 6º disputarão duas vagas de acesso em semifinais de ida e volta.</p><button class="btn" id="create-access-playoffs">Gerar confrontos do acesso</button></div>';
   if(competition.division==='B'&&competition.playoffs)content+=renderPlayoffs(competition);
 
  }else{
   content='<div class="club-list">'+participants.map(club=>'<div class="club"><span>'+clubLink(club,club.name)+(club.state?' · '+esc(club.state):'')+'</span><span class="tag">'+clubRating(club).overall+'/100</span></div>').join('')+'</div>';
   if(!participants.length)content='<div class="empty">Nenhum clube inscrito nesta competição.</div>';
  }
- view.innerHTML='<div class="competition-detail-head"><button class="btn secondary" id="back-competitions">← Voltar às competições</button><span class="tag">TEMPORADA '+season.year+' · '+esc(season.status)+'</span></div><div class="panel"><div class="panel-head"><div><span class="eyebrow">'+esc(competition.country||'Brasil').toUpperCase()+'</span><h2>'+esc(competition.name)+'</h2></div><span class="tag">'+participants.length+' CLUBES</span></div><div class="competition-tabs">'+tabs.map(([key,label])=>'<button class="competition-tab '+(section===key?'active':'')+'" data-competition-tab="'+key+'">'+label+'</button>').join('')+'</div><div class="competition-section">'+content+'</div></div>';
- document.querySelector('#back-competitions').addEventListener('click',renderCompetitions);
+ const argentinaPrimera=competition.argentinaType==='primera'?season.competitions.filter(c=>c.argentinaType==='primera'):[];const competitionTitle=competition.argentinaType==='primera'?'Primera División':competition.name;view.innerHTML='<div class="competition-detail-head"><button class="btn secondary" id="back-competitions">← Voltar às competições</button><span class="tag">TEMPORADA '+season.year+' · '+esc(season.status)+'</span></div><div class="panel"><div class="panel-head"><div><span class="eyebrow">'+esc(competition.country||'Brasil').toUpperCase()+'</span><h2>'+esc(competitionTitle)+'</h2>'+(argentinaPrimera.length>1?'<div class="field phase-selector"><label for="argentina-phase">Torneio da temporada</label><select id="argentina-phase">'+argentinaPrimera.map(c=>'<option value="'+c.id+'" '+(c.id===competition.id?'selected':'')+'>'+esc(c.phase)+'</option>').join('')+'</select></div>':'')+'</div><span class="tag">'+participants.length+' CLUBES</span></div><div class="competition-tabs">'+tabs.map(([key,label])=>'<button class="competition-tab '+(section===key?'active':'')+'" data-competition-tab="'+key+'">'+label+'</button>').join('')+'</div><div class="competition-section">'+content+'</div></div>';
+ document.querySelector('#back-competitions').addEventListener('click',renderCompetitions);const phaseSelect=document.querySelector('#argentina-phase');if(phaseSelect)phaseSelect.addEventListener('change',()=>renderCompetitionDetail(seasonId,phaseSelect.value,section));
  view.querySelectorAll('[data-competition-tab]').forEach(b=>b.addEventListener('click',()=>renderCompetitionDetail(seasonId,competitionId,b.dataset.competitionTab)));
  view.querySelectorAll('[data-open-club]').forEach(b=>b.addEventListener('click',()=>renderClubDetail(b.dataset.openClub,{type:'competition',seasonId,competitionId,section})));
- const createPlayoffs=document.querySelector('#create-access-playoffs');
+ const createArgentinaPlayoffs=document.querySelector('#create-argentina-playoffs');if(createArgentinaPlayoffs)createArgentinaPlayoffs.addEventListener('click',()=>{const ok=competition.argentinaType==='primera'?argentinaBuildPrimeraPlayoffs(competition):argentinaNacionalCreatePlayoffs(competition);if(!ok){alert('Não foi possível gerar o mata-mata. Confira se todas as posições necessárias têm partidas disputadas.');return;}save();renderCompetitionDetail(seasonId,competitionId,'games');});const simulateArgentinaKnockout=document.querySelector('#simulate-argentina-knockout');if(simulateArgentinaKnockout)simulateArgentinaKnockout.addEventListener('click',()=>{argentinaSimulateKnockout(competition);save();renderCompetitionDetail(seasonId,competitionId,'games');});const createPlayoffs=document.querySelector('#create-access-playoffs');
  if(createPlayoffs)createPlayoffs.addEventListener('click',()=>{if(createAccessPlayoffs(competition)){save();renderCompetitionDetail(seasonId,competitionId,'games');}});
  const playoffSim=document.querySelector('#simulate-playoff-leg');
  if(playoffSim)playoffSim.addEventListener('click',()=>{simulateNextPlayoffLeg(competition);save();renderCompetitionDetail(seasonId,competitionId,'games');});
