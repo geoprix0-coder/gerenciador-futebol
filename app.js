@@ -1203,7 +1203,12 @@ function sudamericanaLibertadoresEdition(season){
  return season?.competitions.find(comp=>comp.libertadoresCompetition&&comp.libertadoresYear===season.year)||null;
 }
 function sudamericanaPhase3Losers(libertadores){
- return [...(libertadores?.libertadoresPhase3Losers||[])];
+ const saved=[...(libertadores?.libertadoresPhase3Losers||[])];if(saved.length===4)return saved;
+ if(libertadores?.libertadoresStage==='preliminary3'&&(libertadores.libertadoresTies||[]).length===4){
+  const derived=libertadores.libertadoresTies.map(tie=>{const winner=libertadoresTieWinner(tie);return winner?tie.home===winner?tie.away:tie.home:null;}).filter(Boolean);
+  if(derived.length===4)return derived;
+ }
+ return saved;
 }
 function sudamericanaGroupParticipants(c){
  const winners=(c.sudamericanaPreliminaryTies||[]).map(sudamericanaPreliminaryTieWinner);
@@ -1226,9 +1231,14 @@ function sudamericanaCreateGroups(c){
  c.sudamericanaGroupRounds=JSON.parse(JSON.stringify(c.rounds));
  return true;
 }
+function sudamericanaBuildGroupSchedule(c){
+ const schedules=Object.values(c.sudamericanaGroups||{}).map(ids=>peruRoundRobin(ids));
+ c.rounds=Array.from({length:6},(_,i)=>({number:i+1,matches:schedules.flatMap(rounds=>rounds[i]||[])}));
+ c.sudamericanaGroupRounds=JSON.parse(JSON.stringify(c.rounds));
+}
 function sudamericanaGroupsComplete(c){
  const rounds=c.sudamericanaGroupRounds||c.rounds||[];
- return rounds.length===6&&rounds.every(round=>round.matches.length===12&&round.matches.every(match=>match.homeGoals!==null&&match.awayGoals!==null));
+ return rounds.length===6&&rounds.every(round=>round.matches.length===16&&round.matches.every(match=>match.homeGoals!==null&&match.awayGoals!==null));
 }
 function sudamericanaGroupTable(c,key){return peruTable(c,c.sudamericanaGroups?.[key]||[],c.sudamericanaGroupRounds||c.rounds||[]);}
 function sudamericanaLibertadoresThirds(c){
@@ -1305,8 +1315,8 @@ function sudamericanaTableView(c){
  if(c.sudamericanaStage==='groups'||c.sudamericanaStage==='playoff8'||c.sudamericanaStage==='round16'||c.sudamericanaStage==='quarterfinals'||c.sudamericanaStage==='semifinals'||c.sudamericanaStage==='final'||c.sudamericanaStage==='completed'){
   let html='<div class="argentina-rules"><p>CONMEBOL Sudamericana '+c.sudamericanaYear+': oito grupos de quatro. O líder avança às oitavas; o segundo disputa o playoff contra um terceiro colocado da Libertadores. Os terceiros e quartos encerram sua participação.</p></div>';
   if(c.sudamericanaGroups)html+=['A','B','C','D','E','F','G','H'].map(key=>'<h3 class="season-heading">Grupo '+key+'</h3>'+peruTableHtml(sudamericanaGroupTable(c,key))).join('');
-  if(c.sudamericanaTies?.length)html+=c.sudamericanaStage==='completed'?'<p class="access-confirmation">Campeão da CONMEBOL Sudamericana '+c.sudamericanaYear+': '+esc(getClub(c.sudamericanaChampion)?.name||'')+'</p>':c.sudamericanaTies.map(libertadoresTieHtml).join('');
-  if(c.sudamericanaStage==='completed')html+='<p class="access-confirmation">Campeão: '+esc(getClub(c.sudamericanaChampion)?.name||'')+'</p>';
+  if(c.sudamericanaTies?.length&&c.sudamericanaStage!=='completed')html+=c.sudamericanaTies.map(libertadoresTieHtml).join('');
+  if(c.sudamericanaStage==='completed')html+='<p class="access-confirmation">Campeão da CONMEBOL Sudamericana '+c.sudamericanaYear+': '+esc(getClub(c.sudamericanaChampion)?.name||'')+'</p>';
   return html;
  }
  return '<div class="empty">Aguardando a definição da edição.</div>';
@@ -2026,7 +2036,7 @@ function argentinaCompetitionDescription(c){
  return 'Primeira Nacional 2026: 2 zonas de 18, turno e returno (34 datas) mais 2 jogos interzonais (36 datas). Os campeões das zonas fazem final em jogo único pelo 1º acesso. O Reducido começa com os 2º–8º de cada zona (14 clubes) na primeira fase; na segunda fase entram os sete vencedores e o perdedor da final pelo 1º acesso. O campeão do Reducido conquista o 2º acesso. Caem os dois últimos de cada zona.';
 }
 function buildSchedule(competition){
- if(competition.sudamericanaCompetition){if(competition.sudamericanaStage==='groups'&&!(competition.rounds||[]).length)sudamericanaCreateGroups(competition);return;}
+ if(competition.sudamericanaCompetition){if(competition.sudamericanaStage==='groups'&&!(competition.rounds||[]).length)sudamericanaBuildGroupSchedule(competition);return;}
  if(competition.libertadoresCompetition){if(competition.libertadoresStage==='groups'&&!(competition.rounds||[]).length)libertadoresBuildGroupSchedule(competition);return;}
  if(competition.boliviaDivision==='Copa de la División Profesional'||competition.boliviaDivision==='Copa Simón Bolívar'){boliviaGroupSchedule(competition);return;}
  if(competition.argentinaType){buildArgentinaSchedule(competition);return;}if(competition.peruDivision){peruBuildSchedule(competition);return;}if(competition.venezuelaDivision==='Segunda División'){const a=venezuelaRoundRobin(competition.zones.A),b=venezuelaRoundRobin(competition.zones.B);competition.rounds=Array.from({length:Math.max(a.length,b.length)},(_,i)=>({number:i+1,matches:[...(a[i]||[]),...(b[i]||[])]}));competition.venezuelaStage='regional';return;}if(competition.venezuelaDivision==='Primera División'){competition.rounds=venezuelaRoundRobin(competition.participants).slice(0,13).map((matches,i)=>({number:i+1,matches}));competition.venezuelaStage='regular';return;}
