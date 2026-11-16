@@ -52,6 +52,7 @@ O ranking usa uma implementação do modelo SUM inspirada na metodologia FIFA:
 - atualização após cada resultado internacional;
 - importância da partida configurada por tipo/fase (pesos de 5 a 60);
 - tratamento separado de empates decididos por pênaltis;
+- proteção contra perda de pontos em fases eliminatórias de torneios finais, conforme a regra SUM;
 - rankings mundial e filtrados por confederação;
 - histórico de partidas e variações de pontos.
 
