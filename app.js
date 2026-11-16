@@ -504,7 +504,7 @@ function uruguayCreateAccessPlayoffs(competition){
 function uruguayEnsureAccessPlayoffs(competition){
  const p=competition?.uruguayAccess;if(!p)return false;
  const s=getStandings(competition);if(s.length<6)return false;
- const expected=s.slice(0,6).map(r=>r.id),saved=p.seedTable||[...(p.promotedDirect||[]),...(p.semifinals||[]).flatMap(t=>[t.teamA,t.teamB])];
+ const expected=s.slice(0,6).map(r=>r.id),saved=p.seedTable||[...(p.promotedDirect||[]),p.semifinals?.[0]?.teamA,p.semifinals?.[1]?.teamA,p.semifinals?.[1]?.teamB,p.semifinals?.[0]?.teamB].filter(Boolean);
  const same=(a,b)=>a.length===b.length&&a.every((id,i)=>id===b[i]);
  if(same(expected,saved))return false;
  const played=[...(p.semifinals||[]),...(p.final?[p.final]:[])].some(t=>(t.legs||[]).some(m=>m.homeGoals!==null||m.awayGoals!==null));
