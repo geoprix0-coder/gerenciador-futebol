@@ -220,8 +220,8 @@ function buildArgentinaSchedule(competition){
   };
   const a=makeRounds(zoneA),b=makeRounds(zoneB),rounds=[],pairs=competition.classicPairs||[];
   for(let i=0;i<15;i++){
-   const pair=pairs[i]||[];
-   const roundA=a.find(r=>r.bye===pair[0])||a[i],roundB=b.find(r=>r.bye===pair[1])||b[i];
+   const pair=pairs[i]||[],aBye=zoneA.includes(pair[0])?pair[0]:pair[1],bBye=zoneB.includes(pair[0])?pair[0]:pair[1];
+   const roundA=a.find(r=>r.bye===aBye)||a[i],roundB=b.find(r=>r.bye===bBye)||b[i];
    const cross=[{home:pair[0]||roundA.bye,away:pair[1]||roundB.bye,homeGoals:null,awayGoals:null,kind:'interzonal'}];
    rounds.push({number:i+1,matches:[...roundA.matches,...roundB.matches,...cross]});
   }
