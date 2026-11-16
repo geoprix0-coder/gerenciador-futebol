@@ -852,6 +852,7 @@ function render(page='inicio'){
  document.querySelectorAll('.nav-item').forEach(b=>b.classList.toggle('active',b.dataset.view===page));
  if(page==='inicio')renderHome();
  else if(page==='clubes')renderClubs();
+  else if(page==='selecoes')renderSelections();
  else if(page==='temporadas')renderSeasons();
  else if(page==='competicoes')renderCompetitions(activeCompetitionContinent);
  else {const desc={partidas:'As partidas serão geradas pelo calendário e terão resultados simulados automaticamente.',classificacao:'A classificação será calculada automaticamente a partir dos resultados das partidas.',historico:'As temporadas concluídas e as avaliações dos clubes ficarão registradas aqui.'};view.innerHTML='<div class="panel"><h3>'+labels[page]+'</h3><p class="muted">'+desc[page]+'</p><div class="empty">Este módulo será desenvolvido em uma próxima etapa.</div></div>';}
