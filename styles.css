@@ -10,7 +10,7 @@
 .competition-open strong,.competition-open small{display:block}
 .competition-open strong{font-size:13px}
 .competition-open small{color:var(--muted);font-size:11px;margin-top:5px}
-.competition-open-action{color:var(--accent);font-size:12px;font-weight:700;white-space:nowrap}
+.competition-open-action{color:var(--accent);font-size:12px;font-weight:700;white-space:nowrap}.competition-status{margin-left:auto;padding:5px 9px;border-radius:20px;font-size:10px;font-weight:700;white-space:nowrap}.competition-status.pending{background:#26364d;color:#aebbd0}.competition-status.progress{background:#493a18;color:#f0c65c}.competition-status.done{background:#17392f;color:#65dda0}
 .competition-detail-head{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:16px}
 .competition-tabs{display:flex;gap:7px;border-bottom:1px solid var(--line);margin:18px 0}
 .competition-tab{background:transparent;border:0;color:var(--muted);padding:11px 14px;cursor:pointer;font:600 12px 'DM Sans';border-bottom:2px solid transparent}
