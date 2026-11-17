@@ -97,6 +97,9 @@ const WORLDCUP_2026_RULES={
  OFC:{name:'Oceania · OFC',slots:'1 direta + 1 na repescagem intercontinental',format:'Primeira fase entre as quatro seleções de menor ranking; a vencedora avança. Segunda fase: oito seleções em dois grupos de quatro, em turno único; as duas primeiras de cada grupo avançam. Terceira fase: semifinais cruzadas e final em jogo único. O campeão classifica-se diretamente e o vice disputa a repescagem intercontinental.',stages:['Preliminar: 4 seleções','Fase de grupos: 2 grupos de 4, turno único','Fase final: semifinais e final em jogo único']}
 };
 let activeWorldCupQualifier=null;
+const WORLDCUP_QUALIFIER_STORE='wfs-worldcup-qualifiers-2026-v1';
+let worldCupQualifierDraws=JSON.parse(localStorage.getItem(WORLDCUP_QUALIFIER_STORE)||'{}');
+if(!worldCupQualifierDraws||typeof worldCupQualifierDraws!=='object')worldCupQualifierDraws={};
 
 const CONFEDERATION_NAMES={UEFA:'Europa · UEFA',CAF:'África · CAF',AFC:'Ásia · AFC',CONCACAF:'América do Norte, Central e Caribe · CONCACAF',CONMEBOL:'América do Sul · CONMEBOL',OFC:'Oceania · OFC'};
 const MATCH_IMPORTANCE=[
@@ -220,6 +223,11 @@ function renderSelections(tab=activeSelectionTab){
  view.innerHTML=content;
  view.addEventListener('click',e=>{const row=e.target.closest('[data-selection-profile]');if(row&&view.contains(row)){activeSelectionProfileId=row.dataset.selectionProfile;renderSelections(activeSelectionTab);}});
  view.querySelectorAll('[data-open-friendly="true"]').forEach(b=>b.addEventListener('click',()=>{activeFriendlyPage=true;renderSelections('competitions');}));
+ view.querySelector('[data-open-worldcup="true"]')?.addEventListener('click',()=>{activeFriendlyPage=false;activeWorldCupQualifier='overview';renderSelections('competitions');});
+ view.querySelectorAll('[data-worldcup-confed]').forEach(b=>b.addEventListener('click',()=>{activeWorldCupQualifier=b.dataset.worldcupConfed;renderSelections('competitions');}));
+ view.querySelector('[data-worldcup-draw]')?.addEventListener('click',e=>drawWorldCupQualifierInitial(e.currentTarget.dataset.worldcupDraw));
+ const worldCupBack=document.querySelector('#worldcup-qualifier-back');if(worldCupBack)worldCupBack.addEventListener('click',()=>{activeWorldCupQualifier==='overview'?(activeWorldCupQualifier=null):(activeWorldCupQualifier='overview');renderSelections('competitions');});
+
  const friendlyBack=document.querySelector('#friendly-back');if(friendlyBack)friendlyBack.addEventListener('click',()=>{activeFriendlyPage=false;renderSelections('competitions');});
  const drawButton=document.querySelector('#friendly-draw');if(drawButton)drawButton.addEventListener('click',drawInternationalFriendlyFixtures);
  const simulateButton=document.querySelector('#friendly-simulate');if(simulateButton)simulateButton.addEventListener('click',simulateInternationalFriendlyFixtures);
@@ -230,10 +238,35 @@ function renderSelections(tab=activeSelectionTab){
  const matchForm=document.querySelector('#international-match-form');if(matchForm)matchForm.addEventListener('submit',e=>{e.preventDefault();if(recordInternationalMatch(matchForm)){alert('Partida registrada. O ranking mundial e o ranking continental foram atualizados.');renderSelections('ranking');}});
 }
 
+function shuffleQualifierTeams(teams){const list=teams.slice();for(let i=list.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[list[i],list[j]]=[list[j],list[i]];}return list;}
+function drawWorldCupQualifierInitial(confederation){
+ if(worldCupQualifierDraws[confederation]){alert('A fase inicial desta confederação já foi sorteada.');return;}
+ const ranked=rankedSelections().filter(t=>t.confederation===confederation),copy=t=>({id:t.id,name:t.name,iso:t.iso});
+ let result={confederation,drawnAt:new Date().toLocaleString('pt-BR')};
+ if(confederation==='UEFA'||confederation==='CAF'){
+  const count=confederation==='UEFA'?12:9,groups=Array.from({length:count},(_,i)=>({name:'Grupo '+String.fromCharCode(65+i),teams:[]}));
+  if(confederation==='CAF'){const pool=shuffleQualifierTeams(ranked);pool.forEach((t,i)=>groups[i%count].teams.push(copy(t)));}
+  else{const pool=shuffleQualifierTeams(ranked);let cursor=0;groups.forEach((g,i)=>{const size=i<7?5:4;g.teams=pool.slice(cursor,cursor+size).map(copy);cursor+=size;});}
+  result.groups=groups;
+ }else if(confederation==='CONMEBOL'){result.league=shuffleQualifierTeams(ranked).map(copy);}
+ else if(confederation==='AFC'||confederation==='CONCACAF'){
+  const lowest=ranked.slice().sort((a,b)=>(Number(b.rank)||0)-(Number(a.rank)||0)).slice(0,confederation==='AFC'?20:4),pool=shuffleQualifierTeams(lowest),ties=[];
+  for(let i=0;i<pool.length;i+=2)ties.push({teams:[copy(pool[i]),copy(pool[i+1])]});result.ties=ties;
+ }else if(confederation==='OFC'){
+  const lowest=ranked.slice().sort((a,b)=>(Number(b.rank)||0)-(Number(a.rank)||0)).slice(0,4);
+  result.groups=[{name:'Grupo preliminar',teams:shuffleQualifierTeams(lowest).map(copy)}];
+ }
+ worldCupQualifierDraws[confederation]=result;localStorage.setItem(WORLDCUP_QUALIFIER_STORE,JSON.stringify(worldCupQualifierDraws));renderSelections('competitions');
+}
 function renderWorldCupQualifierDetail(confederation){
- const rule=WORLDCUP_2026_RULES[confederation];
- if(!rule)return '<div class="panel">Confederação não encontrada.</div>';
- return '<div class="worldcup-qualifier-page"><button class="btn btn-secondary selection-back" id="worldcup-qualifier-back">← Voltar</button><div class="panel"><span class="eyebrow">ELIMINATÓRIAS FIFA · CICLO 2026</span><h2>'+esc(rule.name)+'</h2><p class="tag">'+esc(rule.slots)+'</p><p class="muted worldcup-rule-copy">'+esc(rule.format)+'</p><h3>Estrutura oficial</h3><ol class="worldcup-stage-list">'+rule.stages.map(stage=>'<li>'+esc(stage)+'</li>').join('')+'</ol></div></div>';
+ const rule=WORLDCUP_2026_RULES[confederation];if(!rule)return '<div class="panel">Confederação não encontrada.</div>';
+ const draw=worldCupQualifierDraws[confederation];
+ const drawButton=draw?'<div class="worldcup-draw-status"><strong>Fase inicial sorteada</strong><span>'+esc(draw.drawnAt||'')+'</span></div>':'<div class="worldcup-draw-action"><p class="muted">O sorteio ainda não foi realizado. Nenhum grupo ou confronto será criado automaticamente.</p><button class="btn" id="worldcup-draw-initial" data-worldcup-draw="'+confederation+'">Sortear fase inicial</button></div>';
+ let drawContent='';
+ if(draw?.groups)drawContent='<div class="worldcup-drawn-groups">'+draw.groups.map((g,i)=>'<section class="worldcup-drawn-group"><h4>'+esc(g.name||('Grupo '+String.fromCharCode(65+i)))+'</h4>'+g.teams.map(t=>'<div class="worldcup-team-row"><span>'+flagEmoji(t.iso)+' '+esc(t.name)+'</span></div>').join('')+'</section>').join('')+'</div>';
+ if(draw?.ties)drawContent='<div class="worldcup-drawn-ties">'+draw.ties.map((tie,i)=>'<section class="worldcup-drawn-group"><h4>Confronto '+(i+1)+'</h4>'+tie.teams.map(t=>'<div class="worldcup-team-row"><span>'+flagEmoji(t.iso)+' '+esc(t.name)+'</span></div>').join('<div class="worldcup-tie-separator">×</div>')+'</section>').join('')+'</div>';
+ if(draw?.league)drawContent='<div class="worldcup-drawn-group"><h4>Liga única · 10 seleções</h4>'+draw.league.map((t,i)=>'<div class="worldcup-team-row"><span>'+(i+1)+'. '+flagEmoji(t.iso)+' '+esc(t.name)+'</span></div>').join('')+'</div>';
+ return '<div class="worldcup-qualifier-page"><button class="btn btn-secondary selection-back" id="worldcup-qualifier-back">← Voltar aos continentes</button><div class="panel"><span class="eyebrow">ELIMINATÓRIAS FIFA · CICLO 2026</span><h2>'+esc(rule.name)+'</h2><p class="tag">'+esc(rule.slots)+'</p><p class="muted worldcup-rule-copy">'+esc(rule.format)+'</p><h3>Estrutura oficial</h3><ol class="worldcup-stage-list">'+rule.stages.map(stage=>'<li>'+esc(stage)+'</li>').join('')+'</ol></div><div class="panel"><div class="worldcup-draw-heading"><div><h3>Fase inicial</h3><p class="muted">'+(confederation==='UEFA'?'12 grupos de 4 ou 5 seleções':confederation==='CAF'?'9 grupos de 6 seleções':confederation==='CONMEBOL'?'Liga única com 10 seleções':confederation==='AFC'?'Primeira rodada: 10 confrontos preliminares':confederation==='CONCACAF'?'Primeira rodada: 2 confrontos preliminares':'Fase preliminar: 4 seleções')+'</p></div>'+drawButton+'</div>'+drawContent+'</div></div>';
 }
 function renderWorldCupQualifiers(){
  const cards=Object.entries(WORLDCUP_2026_RULES).map(([code,rule])=>'<button type="button" class="competition-open worldcup-confed-card" data-worldcup-confed="'+code+'"><span><strong>'+esc(rule.name)+'</strong><small>'+esc(rule.slots)+'</small></span><span class="competition-open-action">Abrir regulamento →</span></button>').join('');
