@@ -239,7 +239,19 @@ function renderSelections(tab=activeSelectionTab){
   }
  }
  view.innerHTML=content;
- view.addEventListener('click',e=>{const row=e.target.closest('[data-selection-profile]');if(row&&view.contains(row)){activeSelectionProfileId=row.dataset.selectionProfile;renderSelections(activeSelectionTab);}});
+ view.onclick=e=>{
+  const target=e.target.closest('button');if(!target||!view.contains(target))return;
+  const profile=target.closest('[data-selection-profile]');if(profile){activeSelectionProfileId=profile.dataset.selectionProfile;renderSelections(activeSelectionTab);return;}
+  const confed=target.closest('[data-worldcup-confed]');if(confed){activeWorldCupQualifier=confed.dataset.worldcupConfed;activeWorldCupQualifierGroup=null;renderSelections('competitions');return;}
+  const initialDraw=target.closest('[data-worldcup-draw]');if(initialDraw){drawWorldCupQualifierInitial(initialDraw.dataset.worldcupDraw);return;}
+  if(target.id==='worldcup-advance-phase'){advanceWorldCupQualifierPhase(activeWorldCupQualifier);renderSelections('competitions');return;}
+  if(target.id==='worldcup-draw-next-phase'){drawWorldCupQualifierNextPhase(activeWorldCupQualifier);renderSelections('competitions');return;}
+  const group=target.closest('[data-worldcup-group]');if(group){activeWorldCupQualifierGroup=group.dataset.worldcupGroup==='league'?'league':Number(group.dataset.worldcupGroup);renderSelections('competitions');return;}
+  if(target.id==='worldcup-group-back'){activeWorldCupQualifierGroup=null;renderSelections('competitions');return;}
+  if(target.id==='worldcup-simulate-round'){const draw=worldCupQualifierDraws[activeWorldCupQualifier],key=activeWorldCupQualifierGroup,rounds=key==='league'?draw?.rounds:draw?.groups?.[key]?.rounds,next=rounds?.findIndex(r=>r.matches.some(m=>m.homeGoals===null||m.awayGoals===null));if(next!==undefined&&next>=0)simulateWorldCupQualifierRound(activeWorldCupQualifier,key,next);renderSelections('competitions');return;}
+  if(target.id==='worldcup-simulate-ties'){const draw=worldCupQualifierDraws[activeWorldCupQualifier],leg=draw?.ties?.some(t=>t.legs?.[0]?.homeGoals===null)?0:1;simulateWorldCupQualifierTies(activeWorldCupQualifier,leg);renderSelections('competitions');return;}
+  if(target.id==='worldcup-qualifier-back'){activeWorldCupQualifier==='overview'?(activeWorldCupQualifier=null):(activeWorldCupQualifier='overview');activeWorldCupQualifierGroup=null;renderSelections('competitions');return;}
+ };
  view.querySelectorAll('[data-open-friendly="true"]').forEach(b=>b.addEventListener('click',()=>{activeWorldCupFinal=false;activeFriendlyPage=true;renderSelections('competitions');}));
  view.querySelector('[data-open-worldcup="true"]')?.addEventListener('click',()=>{activeFriendlyPage=false;activeWorldCupFinal=false;activeWorldCupQualifier='overview';renderSelections('competitions');});
  view.querySelectorAll('[data-open-worldcup-final="true"]').forEach(b=>b.addEventListener('click',()=>{activeFriendlyPage=false;activeWorldCupQualifier=null;activeWorldCupFinal=true;renderSelections('competitions');}));
@@ -249,18 +261,18 @@ function renderSelections(tab=activeSelectionTab){
  const icAdvance=document.querySelector('#worldcup-intercontinental-advance');if(icAdvance)icAdvance.addEventListener('click',()=>{advanceWorldCupIntercontinental();renderSelections('competitions');});
  const icFinals=document.querySelector('#worldcup-intercontinental-simulate-finals');if(icFinals)icFinals.addEventListener('click',()=>{simulateWorldCupIntercontinentalFinals();renderSelections('competitions');});
 
- view.querySelectorAll('[data-worldcup-confed]').forEach(b=>b.addEventListener('click',()=>{activeWorldCupQualifier=b.dataset.worldcupConfed;activeWorldCupQualifierGroup=null;renderSelections('competitions');}));
- view.querySelector('[data-worldcup-draw]')?.addEventListener('click',e=>drawWorldCupQualifierInitial(e.currentTarget.dataset.worldcupDraw));
- const advanceQualifier=document.querySelector('#worldcup-advance-phase');if(advanceQualifier)advanceQualifier.addEventListener('click',()=>{advanceWorldCupQualifierPhase(activeWorldCupQualifier);renderSelections('competitions');});
- const drawNextQualifier=document.querySelector('#worldcup-draw-next-phase');if(drawNextQualifier)drawNextQualifier.addEventListener('click',()=>{drawWorldCupQualifierNextPhase(activeWorldCupQualifier);renderSelections('competitions');});
-
- view.querySelectorAll('[data-worldcup-group]').forEach(b=>b.addEventListener('click',()=>{activeWorldCupQualifierGroup=b.dataset.worldcupGroup==='league'?'league':Number(b.dataset.worldcupGroup);renderSelections('competitions');}));
- const groupBack=document.querySelector('#worldcup-group-back');if(groupBack)groupBack.addEventListener('click',()=>{activeWorldCupQualifierGroup=null;renderSelections('competitions');});
- const simulateQualifierRound=document.querySelector('#worldcup-simulate-round');if(simulateQualifierRound)simulateQualifierRound.addEventListener('click',()=>{const draw=worldCupQualifierDraws[activeWorldCupQualifier],key=activeWorldCupQualifierGroup,rounds=key==='league'?draw?.rounds:draw?.groups?.[key]?.rounds,next=rounds?.findIndex(r=>r.matches.some(m=>m.homeGoals===null||m.awayGoals===null));if(next===undefined||next<0)return;simulateWorldCupQualifierRound(activeWorldCupQualifier,key,next);renderSelections('competitions');});
- const simulateQualifierTies=document.querySelector('#worldcup-simulate-ties');if(simulateQualifierTies)simulateQualifierTies.addEventListener('click',()=>{const draw=worldCupQualifierDraws[activeWorldCupQualifier],leg=draw?.ties?.some(t=>t.legs?.[0]?.homeGoals===null)?0:1;simulateWorldCupQualifierTies(activeWorldCupQualifier,leg);renderSelections('competitions');});
 
 
- const worldCupBack=document.querySelector('#worldcup-qualifier-back');if(worldCupBack)worldCupBack.addEventListener('click',()=>{activeWorldCupQualifier==='overview'?(activeWorldCupQualifier=null):(activeWorldCupQualifier='overview');renderSelections('competitions');});
+
+
+
+
+
+
+
+
+
+
 
  const friendlyBack=document.querySelector('#friendly-back');if(friendlyBack)friendlyBack.addEventListener('click',()=>{activeFriendlyPage=false;renderSelections('competitions');});
  const drawButton=document.querySelector('#friendly-draw');if(drawButton)drawButton.addEventListener('click',drawInternationalFriendlyFixtures);
