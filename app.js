@@ -635,7 +635,7 @@ function renderSelectionProfile(id){
  const ratingForm=document.querySelector('#selection-rating-form');
  ratingForm.addEventListener('submit',e=>{
   e.preventDefault();
-  const values=['overall','attack','defense'].map(k=>Number(ratingForm.elements.namedItem('selection-rating-'+k)?.value));
+  const values=['overall','attack','defense'].map(k=>Number(document.querySelector('#selection-rating-'+k)?.value));
   if(values.some(v=>!Number.isInteger(v)||v<1||v>100)){
    alert('Informe valores inteiros entre 1 e 100 para força geral, ataque e defesa.');
    return;
