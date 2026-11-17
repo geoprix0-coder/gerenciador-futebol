@@ -168,6 +168,20 @@ function selectionRating(team){
 rankedSelections().forEach(team=>initializeSelectionRating(getNationalTeam(team.id),team.rank));
 saveSelections();
 function selectionMatchExpected(home,away){return 1/(1+Math.pow(10,-((home.points-away.points)/600)));}
+function updateSelectionRatingsAfterMatch(home,away,homeGoals,awayGoals){
+ const h=selectionRating(home),a=selectionRating(away);
+ const expectedHome=1/(1+Math.pow(10,((a.overall-h.overall)-3)/22));
+ const actualHome=homeGoals>awayGoals?1:homeGoals<awayGoals?0:.5;
+ const margin=Math.min(3,Math.abs(homeGoals-awayGoals)),k=2.2*(1+margin*.12);
+ const shift=k*(actualHome-expectedHome);
+ home.overall=boundedRating(h.overall+shift);away.overall=boundedRating(a.overall-shift);
+ home.attack=boundedRating(h.attack+Math.max(-1.8,Math.min(1.8,(homeGoals-(1.25+(h.attack-a.defense)/35))*.55)));
+ away.attack=boundedRating(a.attack+Math.max(-1.8,Math.min(1.8,(awayGoals-(1.15+(a.attack-h.defense)/35))*.55)));
+ home.defense=boundedRating(h.defense+Math.max(-1.5,Math.min(1.5,((1.15+(a.attack-h.defense)/35)-awayGoals)*.4)));
+ away.defense=boundedRating(a.defense+Math.max(-1.5,Math.min(1.5,((1.25+(h.attack-a.defense)/35)-homeGoals)*.4)));
+ return {home:Number((home.overall-h.overall).toFixed(2)),away:Number((away.overall-a.overall).toFixed(2))};
+}
+
 function recordInternationalMatch(form){
  const home=getNationalTeam(form.home.value),away=getNationalTeam(form.away.value);
  const homeGoals=Number(form.homeGoals.value),awayGoals=Number(form.awayGoals.value);
@@ -190,8 +204,9 @@ function recordInternationalMatch(form){
  const beforeHome=home.points,beforeAway=away.points;
  home.points=Number((home.points+deltaHome).toFixed(2));away.points=Number((away.points+deltaAway).toFixed(2));
  home.matches=(home.matches||0)+1;away.matches=(away.matches||0)+1;
+ const ratingChange=updateSelectionRatingsAfterMatch(home,away,homeGoals,awayGoals);
  const date=form.matchDate.value||new Date().toISOString().slice(0,10);
- const match={id:uid(),date,home:home.id,away:away.id,homeGoals,awayGoals,type:type.id,typeLabel:type.label,weight:type.weight,protectKnockout,penaltyWinner,homeBefore:beforeHome,awayBefore:beforeAway,homeDelta:Number(deltaHome.toFixed(2)),awayDelta:Number(deltaAway.toFixed(2)),homeAfter:home.points,awayAfter:away.points};
+ const match={id:uid(),date,home:home.id,away:away.id,homeGoals,awayGoals,type:type.id,typeLabel:type.label,weight:type.weight,protectKnockout,penaltyWinner,homeBefore:beforeHome,awayBefore:beforeAway,homeDelta:Number(deltaHome.toFixed(2)),awayDelta:Number(deltaAway.toFixed(2)),homeAfter:home.points,awayAfter:away.points,homeRatingDelta:ratingChange.home,awayRatingDelta:ratingChange.away};
  internationalMatches.unshift(match);
  const rankedAfterMatch=rankedSelections();
  selectionRankHistory.push({date,matchId:match.id,ranks:Object.fromEntries(rankedAfterMatch.map(t=>[t.id,t.rank])),points:Object.fromEntries(rankedAfterMatch.map(t=>[t.id,t.points]))});
