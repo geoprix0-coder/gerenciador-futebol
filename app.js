@@ -990,9 +990,10 @@ function render(page='inicio'){
 }
 function resetTestMatches(){
  const hasSelectionTestData=nationalTeams.some(t=>Math.abs(Number(t.points)-1000)>0.000001||(t.matches||0)>0||(t.history||[]).length)||internationalMatches.length>0||selectionRankHistory.length>0||!!internationalFriendlyDraw;
- const hasTestData=hasSelectionTestData||seasons.some(s=>s.year!==2026||s.countryAdvancements||s.competitions.some(c=>(Array.isArray(c.rounds)&&c.rounds.length)||c.playoffs||c.chilePlayoffs||c.chileTitleTie||c.peruPlayoffs||c.peruStage==='final'||c.peruStage==='playoffs'||c.venezuelaStage&&c.venezuelaStage!==(c.venezuelaDivision==='Primera División'?'regular':'regional')||c.venezuelaRegularRounds||c.venezuelaFinalRounds||c.venezuelaRegionalRounds||c.venezuelaGroups||c.venezuelaTitleFinal||c.venezuelaKnockout||c.boliviaStage==='knockout'||c.boliviaGroupRounds||c.boliviaKnockout||c.boliviaIndirectPlayoff));
+ const hasWorldCupQualifierDraws=Object.keys(worldCupQualifierDraws||{}).length>0;
+ const hasTestData=hasSelectionTestData||hasWorldCupQualifierDraws||seasons.some(s=>s.year!==2026||s.countryAdvancements||s.competitions.some(c=>(Array.isArray(c.rounds)&&c.rounds.length)||c.playoffs||c.chilePlayoffs||c.chileTitleTie||c.peruPlayoffs||c.peruStage==='final'||c.peruStage==='playoffs'||c.venezuelaStage&&c.venezuelaStage!==(c.venezuelaDivision==='Primera División'?'regular':'regional')||c.venezuelaRegularRounds||c.venezuelaFinalRounds||c.venezuelaRegionalRounds||c.venezuelaGroups||c.venezuelaTitleFinal||c.venezuelaKnockout||c.boliviaStage==='knockout'||c.boliviaGroupRounds||c.boliviaKnockout||c.boliviaIndirectPlayoff));
  if(!hasTestData){alert('O sistema já está no estado inicial da temporada de 2026.');return;}
- if(!confirm('Isso apagará todos os calendários, resultados, mata-matas, temporadas posteriores a 2026 e partidas internacionais. O sistema voltará à temporada de 2026, restaurará a força inicial dos clubes e zerará o ranking de seleções para 1.000 pontos por seleção. Os cadastros dos clubes e os participantes de 2026 serão mantidos. Continuar?'))return;
+ if(!confirm('Isso apagará todos os calendários, resultados, mata-matas, temporadas posteriores a 2026, partidas internacionais e sorteios das eliminatórias da Copa do Mundo. O sistema voltará à temporada de 2026, restaurará a força inicial dos clubes e zerará o ranking de seleções para 1.000 pontos por seleção. Os cadastros dos clubes e os participantes de 2026 serão mantidos. Continuar?'))return;
  seasons=seasons.filter(s=>s.year===2026);
  seasons.forEach(s=>{
   delete s.countryAdvancements;
@@ -1002,7 +1003,7 @@ function resetTestMatches(){
  clubs.forEach(club=>{initializeClubRating(club);club.overall=club.initialRating.overall;club.attack=club.initialRating.attack;club.defense=club.initialRating.defense;});
  nationalTeams=(window.WFS_SELECTIONS||[]).map(t=>({...t,points:1000,history:[],matches:0}));
  internationalMatches=[];selectionRankHistory=[];internationalFriendlyDraw=null;
- localStorage.removeItem(FRIENDLY_DRAW_STORE);saveSelections();
+ localStorage.removeItem(FRIENDLY_DRAW_STORE);worldCupQualifierDraws={};activeWorldCupQualifier=null;localStorage.removeItem(WORLDCUP_QUALIFIER_STORE);saveSelections();
  save();render('inicio');alert('O sistema voltou à temporada de 2026. Os jogos e temporadas de teste foram apagados, os clubes tiveram a força restaurada e todas as seleções voltaram a 1.000 pontos.');
 }
 function renderHome(){
