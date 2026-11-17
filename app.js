@@ -267,6 +267,10 @@ function qualifierAllTiesComplete(ties){
 function qualifierAllGroupsComplete(groups){
  return !!groups?.length&&groups.every(g=>g.rounds?.length&&g.rounds.every(r=>r.matches.every(m=>m.homeGoals!==null&&m.awayGoals!==null)));
 }
+function qualifierNextPhaseName(confederation,phase){
+ const labels={UEFA:{1:'Playoffs'},CAF:{1:'Playoff continental · semifinais',2:'Playoff continental · final'},AFC:{1:'2ª rodada',2:'3ª rodada',3:'4ª rodada',4:'5ª rodada · playoff'},CONCACAF:{1:'Segunda rodada',2:'Rodada final'},OFC:{1:'Fase de grupos',2:'Semifinais',3:'Final'}};
+ return labels[confederation]?.[phase]||'Próxima fase';
+}
 function qualifierHasNextPhase(confederation,draw){
  const p=Number(draw?.phaseIndex)||0;
  return (confederation==='UEFA'&&p===0)||(confederation==='CAF'&&p<2)||(confederation==='AFC'&&p<4)||(confederation==='CONCACAF'&&p<2)||(confederation==='OFC'&&p<3);
@@ -299,9 +303,25 @@ function advanceWorldCupQualifierPhase(confederation){
  const draw=worldCupQualifierDraws[confederation];if(!draw||!qualifierStageComplete(draw))return;
  const current=Number(draw.phaseIndex)||0;
  let advancing=[];
- if(draw.ties)advancing=draw.ties.map(qualifierTieWinner).filter(Boolean);
- else if(draw.groups){
-  if(confederation==='CAF'&&current===0)advancing=qualifierGroupWinners(draw.groups,2).filter(r=>r.groupRank===2).sort((a,b)=>b.points-a.points||(b.gf-b.ga)-(a.gf-a.ga)||b.gf-a.gf).slice(0,4).map(r=>r.id);
+ if(draw.ties){
+  const winners=draw.ties.map(qualifierTieWinner).filter(Boolean);
+  if(confederation==='AFC'&&current===0){
+   const preliminary=new Set(draw.ties.flatMap(t=>t.teams.map(x=>x.id)));
+   const others=rankedSelections().filter(t=>t.confederation==='AFC'&&!preliminary.has(t.id)).slice(0,26).map(t=>t.id);
+   advancing=winners.concat(others);
+  }else if(confederation==='CONCACAF'&&current===0){
+   const preliminary=new Set(draw.ties.flatMap(t=>t.teams.map(x=>x.id)));
+   const hosts=new Set(['CAN','MEX','USA']);
+   const others=rankedSelections().filter(t=>t.confederation==='CONCACAF'&&!preliminary.has(t.id)&&!hosts.has(t.iso)).slice(0,28).map(t=>t.id);
+   advancing=winners.concat(others);
+  }else advancing=winners;
+ }else if(draw.groups){
+  if(confederation==='OFC'&&current===0){
+   const preliminary=new Set(draw.groups.flatMap(g=>g.teams.map(t=>t.id)));
+   const winner=qualifierGroupWinners(draw.groups,1).slice(0,1).map(r=>r.id);
+   const others=rankedSelections().filter(t=>t.confederation==='OFC'&&!preliminary.has(t.id)).slice(0,7).map(t=>t.id);
+   advancing=winner.concat(others);
+  }else if(confederation==='CAF'&&current===0)advancing=qualifierGroupWinners(draw.groups,2).filter(r=>r.groupRank===2).sort((a,b)=>b.points-a.points||(b.gf-b.ga)-(a.gf-a.ga)||b.gf-a.gf).slice(0,4).map(r=>r.id);
   else if(confederation==='OFC'&&current===0)advancing=qualifierGroupWinners(draw.groups,1).slice(0,1).map(r=>r.id);
   else if(confederation==='AFC'&&current===1)advancing=qualifierGroupWinners(draw.groups,2).map(r=>r.id);
   else if(confederation==='AFC'&&current===2){const rows=qualifierGroupWinners(draw.groups,4);advancing=rows.filter(r=>r.groupRank===3||r.groupRank===4).map(r=>r.id);}
@@ -326,7 +346,7 @@ function advanceWorldCupQualifierPhase(confederation){
 function drawWorldCupQualifierNextPhase(confederation){
  const draw=worldCupQualifierDraws[confederation];if(!draw?.phasePending||!draw.nextTeams?.length)return;
  const ids=draw.nextTeams.slice(),copy=ids.map(id=>{const t=getNationalTeam(id);return {id:t.id,name:t.name,iso:t.iso};}),phase=draw.phaseIndex;
- draw.phasePending=false;draw.nextTeams=null;draw.phaseName='';
+ draw.phasePending=false;draw.nextTeams=null;draw.phaseName=qualifierNextPhaseName(confederation,phase);
  if(confederation==='UEFA'&&phase===1){draw.phaseName='Playoffs';draw.ties=qualifierMakeTies(ids,true);}
  else if(confederation==='CAF'&&phase===1){draw.phaseName='Playoff continental · semifinais';draw.ties=qualifierMakeTies(ids,true);}
  else if(confederation==='CAF'&&phase===2){draw.phaseName='Playoff continental · final';draw.ties=qualifierMakeTies(ids,true);}
@@ -450,7 +470,7 @@ function renderWorldCupQualifierDetail(confederation){
  }
  if(draw?.league)drawContent='<button class="worldcup-drawn-group worldcup-group-open" data-worldcup-group="league"><h4>Liga única · 10 seleções</h4><span class="muted">'+(draw.rounds?.length||0)+' rodadas · ida e volta</span>'+draw.league.map((t,i)=>'<div class="worldcup-team-row"><span>'+(i+1)+'. '+flagEmoji(t.iso)+' '+esc(t.name)+'</span></div>').join('')+'<strong>Abrir calendário e classificação →</strong></button>';
  let phaseActions='';
- if(draw?.phasePending)phaseActions='<div class="worldcup-phase-action"><h3>Próxima fase disponível</h3><p class="muted">'+esc(draw.phaseName||'A próxima fase')+' · '+(draw.nextTeams?.length||0)+' seleções classificadas. O sorteio só será realizado quando você solicitar.</p><button class="btn" id="worldcup-draw-next-phase">Sortear '+esc(draw.phaseName||'próxima fase')+'</button></div>';
+ if(draw?.phasePending)phaseActions='<div class="worldcup-phase-action"><h3>Próxima fase disponível</h3><p class="muted">'+esc(qualifierNextPhaseName(confederation,Number(draw.phaseIndex)||0))+' · '+(draw.nextTeams?.length||0)+' seleções classificadas. O sorteio só será realizado quando você solicitar.</p><button class="btn" id="worldcup-draw-next-phase">Sortear '+esc(qualifierNextPhaseName(confederation,Number(draw.phaseIndex)||0))+'</button></div>';
  else if(draw&&qualifierStageComplete(draw)&&qualifierHasNextPhase(confederation,draw))phaseActions='<div class="worldcup-phase-action"><h3>Fase concluída</h3><p class="muted">Todos os jogos desta etapa foram concluídos e os classificados estão definidos.</p><button class="btn" id="worldcup-advance-phase">Avançar para a próxima fase</button></div>';
  return '<div class="worldcup-qualifier-page"><button class="btn btn-secondary selection-back" id="worldcup-qualifier-back">← Voltar aos continentes</button><div class="panel"><span class="eyebrow">ELIMINATÓRIAS FIFA · CICLO 2026</span><h2>'+esc(rule.name)+'</h2><p class="tag">'+esc(rule.slots)+'</p><p class="muted worldcup-rule-copy">'+esc(rule.format)+'</p><h3>Estrutura oficial</h3><ol class="worldcup-stage-list">'+rule.stages.map(stage=>'<li>'+esc(stage)+'</li>').join('')+'</ol></div><div class="panel"><div class="worldcup-draw-heading"><div><h3>Fase inicial</h3><p class="muted">'+(confederation==='UEFA'?'12 grupos de 4 ou 5 seleções':confederation==='CAF'?'9 grupos de 6 seleções':confederation==='CONMEBOL'?'Liga única com 10 seleções':confederation==='AFC'?'Primeira rodada: 10 confrontos preliminares':confederation==='CONCACAF'?'Primeira rodada: 2 confrontos preliminares':'Fase preliminar: 4 seleções')+'</p></div>'+drawButton+'</div>'+drawContent+phaseActions+'</div></div>';
 }
