@@ -1088,7 +1088,7 @@ function resetTestMatches(){
  clubs.forEach(club=>{initializeClubRating(club);club.overall=club.initialRating.overall;club.attack=club.initialRating.attack;club.defense=club.initialRating.defense;});
  nationalTeams=(window.WFS_SELECTIONS||[]).map(t=>({...t,points:1000,history:[],matches:0}));
  internationalMatches=[];selectionRankHistory=[];internationalFriendlyDraw=null;
- localStorage.removeItem(FRIENDLY_DRAW_STORE);worldCupQualifierDraws={};activeWorldCupQualifier=null;localStorage.removeItem(WORLDCUP_QUALIFIER_STORE);saveSelections();
+ localStorage.removeItem(FRIENDLY_DRAW_STORE);worldCupQualifierDraws={};activeWorldCupQualifier=null;localStorage.removeItem(WORLDCUP_QUALIFIER_STORE);activeWorldCupQualifierGroup=null;saveSelections();
  save();render('inicio');alert('O sistema voltou à temporada de 2026. Os jogos e temporadas de teste foram apagados, os clubes tiveram a força restaurada e todas as seleções voltaram a 1.000 pontos.');
 }
 function renderHome(){
