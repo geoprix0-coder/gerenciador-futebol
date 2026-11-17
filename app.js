@@ -388,11 +388,23 @@ function ensureWorldCupQualifierSchedules(confederation){
  localStorage.setItem(WORLDCUP_QUALIFIER_STORE,JSON.stringify(worldCupQualifierDraws));
 }
 function simulateSelectionGoals(home,away){
- const h=selectionRating(home),a=selectionRating(away),expected=selectionMatchExpected(home,away);
- const homeLambda=Math.max(.2,1.25+expected*.75+(h.attack-a.defense)/95);
- const awayLambda=Math.max(.2,1.05+(1-expected)*.7+(a.attack-h.defense)/95);
+ const h=selectionRating(home),a=selectionRating(away);
+ const expected=selectionMatchExpected(home,away);
+ const strengthDiff=((h.overall-a.overall)*0.045)+((home.points-away.points)/900)+0.18;
+ const homeWinChance=1/(1+Math.exp(-strengthDiff));
+ const drawChance=0.24;
+ const outcomeRoll=Math.random();
+ const target=outcomeRoll<drawChance?'draw':outcomeRoll<drawChance+(1-drawChance)*homeWinChance?'home':'away';
+ const homeLambda=Math.max(.25,Math.min(3.2,1.35+(h.attack-50)/65+(50-a.defense)/90+.16+(expected-.5)*.35));
+ const awayLambda=Math.max(.25,Math.min(3.2,1.15+(a.attack-50)/65+(50-h.defense)/90+(0.5-expected)*.35));
  const poisson=lambda=>{const limit=Math.exp(-lambda);let k=0,p=1;do{k++;p*=Math.random();}while(p>limit&&k<12);return k-1;};
- return [poisson(homeLambda),poisson(awayLambda)];
+ for(let attempt=0;attempt<40;attempt++){
+  const hg=poisson(homeLambda),ag=poisson(awayLambda);
+  if((target==='draw'&&hg===ag)||(target==='home'&&hg>ag)||(target==='away'&&hg<ag))return [hg,ag];
+ }
+ if(target==='draw')return [1,1];
+ if(target==='home')return [2,1];
+ return [1,2];
 }
 function recordWorldCupQualifierResult(match){
  const home=getNationalTeam(match.home),away=getNationalTeam(match.away);if(!home||!away||match.homeGoals===null||match.awayGoals===null)return;
