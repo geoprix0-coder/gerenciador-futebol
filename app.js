@@ -2185,6 +2185,32 @@ function repairLibertadoresEditions(){
  });
  if(changed)save();
 }
+function competitionDisplayStatus(competition){
+ const matches=[],seen=new Set();
+ const visit=value=>{if(!value||typeof value!=='object'||seen.has(value))return;seen.add(value);if(!Array.isArray(value)&&Object.prototype.hasOwnProperty.call(value,'homeGoals')&&Object.prototype.hasOwnProperty.call(value,'awayGoals'))matches.push(value);if(Array.isArray(value))value.forEach(visit);else Object.values(value).forEach(visit);};
+ visit(competition);
+ if(!matches.length)return {label:'Não iniciado',kind:'pending'};
+ const played=matches.filter(m=>m.homeGoals!==null&&m.homeGoals!==undefined&&m.awayGoals!==null&&m.awayGoals!==undefined).length;
+ if(!played)return {label:'Não iniciado',kind:'pending'};
+ if(played<matches.length)return {label:'Em andamento',kind:'progress'};
+ let terminal=true;
+ if(competition.argentinaType)terminal=!!competition.argentinaPlayoffs?.completed;
+ if(competition.uruguayType==='primera-clausura')terminal=!!competition.uruguayChampionship?.completed;
+ if(competition.uruguayType==='intermedio')terminal=!!competition.uruguayIntermedioFinal?.completed;
+ if(competition.uruguayType==='competencia')terminal=!!competition.uruguayCompetenciaFinal?.completed;
+ if(competition.uruguayType==='segunda-regular')terminal=!!competition.uruguayAccess?.completed;
+ if(competition.chileDivision==='Primera B')terminal=!!competition.chilePlayoffs?.completed&&!!competition.chilePlayoffs?.promoted;
+ if(competition.chileDivision==='Primera División'&&competition.chileTitleTie)terminal=!!competition.chileTitleTie.completed;
+ if(competition.peruDivision==='Liga 2'||(competition.peruDivision==='Primera División'&&competition.peruPhase==='Clausura'))terminal=competition.peruPlayoffs?.stage==='completed';
+ if(competition.ecuadorDivision)terminal=!!ecuadorFinalComplete(competition);
+ if(competition.venezuelaDivision==='Segunda División')terminal=!!competition.venezuelaKnockout?.completed;
+ if(competition.venezuelaDivision==='Primera División')terminal=competition.venezuelaStage==='title'&&!!competition.venezuelaTitleFinal?.completed;
+ if(competition.boliviaDivision==='Primera División')terminal=!!chileTieWinner(competition.boliviaIndirectPlayoff);
+ if(competition.boliviaDivision==='Copa de la División Profesional'||competition.boliviaDivision==='Copa Simón Bolívar')terminal=!!competition.boliviaKnockout?.completed;
+ if(competition.country==='Brasil'&&competition.division==='B'&&competition.participants?.length>=6){const ties=competition.playoffs?.ties||[];terminal=ties.length>0&&ties.every(t=>!!playoffWinner(t));}
+ if(competition.colombiaDivision&&competition.colombiaTournaments)terminal=Object.values(competition.colombiaTournaments).every(t=>t.playoff?.stage==='completed');
+ return terminal?{label:'Concluído',kind:'done'}:{label:'Em andamento',kind:'progress'};
+}
 function renderCompetitions(continent=activeCompetitionContinent){
   repairLegacyVenezuelaAdvance();
   repairLibertadoresEditions();
@@ -2224,6 +2250,15 @@ function renderCompetitions(continent=activeCompetitionContinent){
   const libertadoresEntries=continent==='América do Sul'?seasons.flatMap(season=>season.competitions.filter(comp=>comp.libertadoresCompetition).map(comp=>({season,comp}))).sort((a,b)=>b.season.year-a.season.year):[];
   const continentalHtml=continent==='América do Sul'?'<section class="country-group"><div class="country-heading"><div><h2>Competições continentais</h2><p class="muted">Torneios que reúnem clubes de diferentes países da América do Sul.</p></div></div><button class="competition-open" data-open-libertadores-hub><span><strong>CONMEBOL Libertadores</strong><small>Vagas da próxima edição · classificação nacional · edições e campeões</small></span><span class="competition-open-action">Abrir competição →</span></button><button class="competition-open" data-open-sudamericana-hub><span><strong>CONMEBOL Sudamericana</strong><small>Vagas da próxima edição · fase preliminar · edições e campeões</small></span><span class="competition-open-action">Abrir competição →</span></button>'+libertadoresEntries.map(({season,comp})=>'<button class="competition-open" data-open-competition="'+season.id+'|'+comp.id+'"><span><strong>CONMEBOL Libertadores · '+season.year+'</strong><small>'+comp.participants.length+' participantes · '+esc(libertadoresStageLabel(comp.libertadoresStage))+'</small></span><span class="competition-open-action">Abrir edição →</span></button>').join('')+seasons.flatMap(season=>season.competitions.filter(comp=>comp.sudamericanaCompetition).map(comp=>'<button class="competition-open" data-open-competition="'+season.id+'|'+comp.id+'"><span><strong>CONMEBOL Sudamericana · '+season.year+'</strong><small>'+comp.participants.length+' classificados · '+esc(sudamericanaStageName(comp.sudamericanaStage))+'</small></span><span class="competition-open-action">Abrir edição →</span></button>')).join('')+'</section>':'';
   view.innerHTML='<div class="panel"><div class="panel-head"><h3>Países · '+esc(continent)+'</h3><span class="tag">'+countries.length+' PAÍS(ES)</span></div><p class="muted">Selecione um país para visualizar seus campeonatos e escolher a temporada.</p>'+continentalHtml+(countrySections||'<div class="empty">Ainda não há países cadastrados neste continente.</div>')+'</div>';
+  view.querySelectorAll('[data-open-competition]').forEach(button=>{
+   const [seasonId,competitionId]=button.dataset.openCompetition.split('|');
+   const season=seasons.find(item=>item.id===seasonId),competition=season?.competitions.find(item=>item.id===competitionId);
+   if(!competition)return;
+   const status=competitionDisplayStatus(competition),badge=document.createElement('span');
+   badge.className='competition-status '+status.kind;badge.textContent=status.label;
+   const action=button.querySelector('.competition-open-action');
+   if(action)button.insertBefore(badge,action);else button.appendChild(badge);
+  });
   view.querySelectorAll('[data-country-toggle]').forEach(button=>button.addEventListener('click',()=>{const section=button.closest('.country-group'),body=section.querySelector('.country-content'),open=body.hidden;body.hidden=!open;button.setAttribute('aria-expanded',String(open));button.querySelector('.country-toggle-icon').textContent=open?'−':'＋';}));
   view.querySelectorAll('[data-country-season]').forEach(select=>select.addEventListener('change',()=>{
    const season=seasons.find(s=>s.id===select.value);if(!season)return;
