@@ -288,3 +288,18 @@
 .worldcup-phase-action p{margin:0;font-size:12px;line-height:1.6}
 .worldcup-phase-action .btn{justify-self:start}
 @media(max-width:600px){.worldcup-playoff-panel .fixture{grid-template-columns:minmax(0,1fr) 54px minmax(0,1fr);gap:6px;padding:9px 2px}.worldcup-playoff-panel .fixture-team{font-size:10px}.worldcup-playoff-panel .score{font-size:14px}}
+
+/* Copa do Mundo FIFA 2026 */
+.worldcup-final-summary{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-top:20px}
+.worldcup-final-summary>div,.worldcup-slot-card{background:var(--surface-2,rgba(127,127,127,.08));border:1px solid var(--border);border-radius:12px;padding:14px}
+.worldcup-final-summary strong{display:block;font-size:1.55rem}
+.worldcup-final-summary span,.worldcup-slot-card small,.worldcup-slot-card>span{display:block;color:var(--muted);font-size:.82rem;margin-top:4px}
+.worldcup-hosts,.worldcup-qualified-list{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:8px;margin-top:12px}
+.worldcup-slot-card .worldcup-qualified-list{grid-template-columns:1fr;margin-top:10px}
+.worldcup-slot-track{height:7px;border-radius:99px;background:var(--border);overflow:hidden;margin-top:12px}
+.worldcup-slot-track i{display:block;height:100%;background:var(--accent);border-radius:99px}
+.worldcup-slots-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px;margin-top:14px}
+.worldcup-seeds{padding:12px;border:1px solid var(--border);border-radius:10px;margin:12px 0}
+.worldcup-seeds p{margin-bottom:0}
+.worldcup-final-qualified{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:8px}
+@media(max-width:640px){.worldcup-final-summary{grid-template-columns:1fr}}
