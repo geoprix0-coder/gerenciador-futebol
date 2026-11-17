@@ -245,6 +245,97 @@ function renderSelections(tab=activeSelectionTab){
 }
 
 function shuffleQualifierTeams(teams){const list=teams.slice();for(let i=list.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[list[i],list[j]]=[list[j],list[i]];}return list;}
+function qualifierGroupWinners(groups,count=1){
+ const rows=(groups||[]).map(g=>({group:g,table:worldCupQualifierStandings(g.teams,g.rounds||[])}));
+ return rows.flatMap(x=>x.table.slice(0,count).map((r,i)=>({...r,groupName:x.group.name,groupRank:i+1})));
+}
+function qualifierTieAggregate(tie){
+ const legs=tie.legs||[];let a=0,b=0;
+ legs.forEach(m=>{if(m.homeGoals===null||m.awayGoals===null)return;if(m.home===tie.teams[0].id){a+=m.homeGoals;b+=m.awayGoals;}else{b+=m.homeGoals;a+=m.awayGoals;}});
+ return {a,b};
+}
+function qualifierTieWinner(tie){
+ const score=qualifierTieAggregate(tie);if(score.a>score.b)return tie.teams[0].id;if(score.b>score.a)return tie.teams[1].id;
+ return tie.penaltyWinner||null;
+}
+function qualifierAllTiesComplete(ties){
+ return !!ties?.length&&ties.every(t=>(t.legs||[]).length>0&&t.legs.every(m=>m.homeGoals!==null&&m.awayGoals!==null)&&(!t.singleLeg||!!qualifierTieWinner(t)));
+}
+function qualifierAllGroupsComplete(groups){
+ return !!groups?.length&&groups.every(g=>g.rounds?.length&&g.rounds.every(r=>r.matches.every(m=>m.homeGoals!==null&&m.awayGoals!==null)));
+}
+function qualifierStageComplete(draw){
+ if(draw.ties)return qualifierAllTiesComplete(draw.ties);
+ if(draw.groups)return qualifierAllGroupsComplete(draw.groups);
+ if(draw.league)return draw.rounds?.length&&draw.rounds.every(r=>r.matches.every(m=>m.homeGoals!==null&&m.awayGoals!==null));
+ return false;
+}
+function qualifierMakeGroups(teams,count,size,doubleRound,namePrefix){
+ const groups=Array.from({length:count},(_,i)=>({name:namePrefix+' '+String.fromCharCode(65+i),teams:[],doubleRound:!!doubleRound}));
+ const pool=shuffleQualifierTeams(teams);
+ pool.forEach((t,i)=>groups[Math.floor(i/size)]?.teams.push({id:t.id,name:t.name,iso:t.iso}));
+ groups.forEach(g=>{g.rounds=buildWorldCupQualifierRounds(g.teams.map(t=>t.id),g.doubleRound);});
+ return groups;
+}
+function qualifierMakeTies(teamIds,singleLeg=false){
+ const pool=shuffleQualifierTeams(teamIds),ties=[];
+ for(let i=0;i<pool.length;i+=2){
+  if(!pool[i+1])continue;
+  const teams=pool.slice(i,i+2).map(id=>{const t=getNationalTeam(id);return {id:t.id,name:t.name,iso:t.iso};});
+  const legs=[{id:uid(),home:teams[0].id,away:teams[1].id,homeGoals:null,awayGoals:null}];
+  if(!singleLeg)legs.push({id:uid(),home:teams[1].id,away:teams[0].id,homeGoals:null,awayGoals:null});
+  ties.push({teams,legs,singleLeg});
+ }
+ return ties;
+}
+function advanceWorldCupQualifierPhase(confederation){
+ const draw=worldCupQualifierDraws[confederation];if(!draw||!qualifierStageComplete(draw))return;
+ const current=Number(draw.phaseIndex)||0;
+ let advancing=[];
+ if(draw.ties)advancing=draw.ties.map(qualifierTieWinner).filter(Boolean);
+ else if(draw.groups){
+  if(confederation==='CAF'&&current===0)advancing=qualifierGroupWinners(draw.groups,2).filter(r=>r.groupRank===2).sort((a,b)=>b.points-a.points||(b.gf-b.ga)-(a.gf-a.ga)||b.gf-a.gf).slice(0,4).map(r=>r.id);
+  else if(confederation==='OFC'&&current===0)advancing=qualifierGroupWinners(draw.groups,1).slice(0,1).map(r=>r.id);
+  else if(confederation==='AFC'&&current===1)advancing=qualifierGroupWinners(draw.groups,2).map(r=>r.id);
+  else if(confederation==='AFC'&&current===2){const rows=qualifierGroupWinners(draw.groups,4);advancing=rows.filter(r=>r.groupRank===3||r.groupRank===4).map(r=>r.id);}
+  else if(confederation==='CONCACAF'&&current===1)advancing=qualifierGroupWinners(draw.groups,2).map(r=>r.id);
+  else if(confederation==='OFC'&&current===1)advancing=qualifierGroupWinners(draw.groups,2).map(r=>r.id);
+  else if(confederation==='UEFA'&&current===0){
+   const runners=qualifierGroupWinners(draw.groups,2).filter(r=>r.groupRank===2).map(r=>r.id);
+   const excluded=new Set(qualifierGroupWinners(draw.groups,1).map(r=>r.id).concat(runners));
+   const extra=rankedSelections().filter(t=>t.confederation==='UEFA'&&!excluded.has(t.id)).slice(0,4).map(t=>t.id);
+   advancing=runners.concat(extra);
+  }
+ }else if(draw.league&&confederation==='CONMEBOL')return;
+ if(!advancing.length)return;
+ draw.history=draw.history||[];
+ draw.history.push({phaseIndex:current,phaseName:draw.phaseName||'Fase inicial',groups:draw.groups||null,ties:draw.ties||null,league:draw.league||null,rounds:draw.rounds||null});
+ draw.phaseIndex=current+1;
+ draw.nextTeams=advancing;
+ draw.phasePending=true;
+ draw.groups=null;draw.ties=null;draw.league=null;draw.rounds=null;
+ localStorage.setItem(WORLDCUP_QUALIFIER_STORE,JSON.stringify(worldCupQualifierDraws));
+}
+function drawWorldCupQualifierNextPhase(confederation){
+ const draw=worldCupQualifierDraws[confederation];if(!draw?.phasePending||!draw.nextTeams?.length)return;
+ const ids=draw.nextTeams.slice(),copy=ids.map(id=>{const t=getNationalTeam(id);return {id:t.id,name:t.name,iso:t.iso};}),phase=draw.phaseIndex;
+ draw.phasePending=false;draw.nextTeams=null;draw.phaseName='';
+ if(confederation==='UEFA'&&phase===1){draw.phaseName='Playoffs';draw.ties=qualifierMakeTies(ids,true);}
+ else if(confederation==='CAF'&&phase===1){draw.phaseName='Playoff continental · semifinais';draw.ties=qualifierMakeTies(ids,true);}
+ else if(confederation==='CAF'&&phase===2){draw.phaseName='Playoff continental · final';draw.ties=qualifierMakeTies(ids,true);}
+ else if(confederation==='AFC'&&phase===1){draw.phaseName='2ª rodada';draw.groups=qualifierMakeGroups(copy,9,4,true,'Grupo');}
+ else if(confederation==='AFC'&&phase===2){draw.phaseName='3ª rodada';draw.groups=qualifierMakeGroups(copy,3,6,true,'Grupo');}
+ else if(confederation==='AFC'&&phase===3){draw.phaseName='4ª rodada';draw.groups=qualifierMakeGroups(copy,2,3,false,'Grupo');}
+ else if(confederation==='AFC'&&phase===4){draw.phaseName='5ª rodada · playoff';draw.ties=qualifierMakeTies(ids,false);}
+ else if(confederation==='CONCACAF'&&phase===1){draw.phaseName='Segunda rodada';draw.groups=qualifierMakeGroups(copy,6,5,false,'Grupo');}
+ else if(confederation==='CONCACAF'&&phase===2){draw.phaseName='Rodada final';draw.groups=qualifierMakeGroups(copy,3,4,true,'Grupo');}
+ else if(confederation==='OFC'&&phase===1){draw.phaseName='Fase de grupos';draw.groups=qualifierMakeGroups(copy,2,4,false,'Grupo');}
+ else if(confederation==='OFC'&&phase===2){draw.phaseName='Semifinais';draw.ties=qualifierMakeTies(ids,true);}
+ else if(confederation==='OFC'&&phase===3){draw.phaseName='Final';draw.ties=qualifierMakeTies(ids,true);}
+ draw.drawnAt=new Date().toLocaleString('pt-BR');
+ localStorage.setItem(WORLDCUP_QUALIFIER_STORE,JSON.stringify(worldCupQualifierDraws));
+}
+
 let activeWorldCupQualifierGroup=null;
 function buildWorldCupQualifierRounds(teamIds,doubleRound=true){
  const teams=teamIds.slice(),rotation=teams.length%2?teams.concat([null]):teams.slice(),size=rotation.length,first=[];
