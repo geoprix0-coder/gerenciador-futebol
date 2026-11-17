@@ -148,20 +148,23 @@ function rankedSelections(list=nationalTeams){
  return sorted.map((team,index)=>{if(last===null||Math.abs(team.points-last)>0.000001)rank=index+1;last=team.points;return {...team,rank};});
 }
 function initializeSelectionRating(team,rank){
- if(team.initialRating&&Number.isFinite(team.initialRating.overall)){
-  team.overall=boundedRating(Number.isFinite(team.overall)?team.overall:team.initialRating.overall);
-  team.attack=boundedRating(Number.isFinite(team.attack)?team.attack:team.initialRating.attack);
-  team.defense=boundedRating(Number.isFinite(team.defense)?team.defense:team.initialRating.defense);
-  return;
- }
  const base=Math.round(88-(Math.max(1,rank)-1)*0.19);
- const overall=boundedRating(Number.isFinite(team.overall)?team.overall:base);
- const attack=boundedRating(Number.isFinite(team.attack)?team.attack:overall+randomInt(-5,5));
- const defense=boundedRating(Number.isFinite(team.defense)?team.defense:overall+randomInt(-5,5));
- team.overall=overall;team.attack=attack;team.defense=defense;
- team.initialRating={overall,attack,defense};
+ const saved=team.initialRating&&typeof team.initialRating==='object'?team.initialRating:{};
+ const hasSavedBaseline=Number.isFinite(Number(saved.overall));
+ const baselineOverall=hasSavedBaseline?boundedRating(Number(saved.overall)):base;
+ const baselineAttack=Number.isFinite(Number(saved.attack))?boundedRating(Number(saved.attack)):baselineOverall;
+ const baselineDefense=Number.isFinite(Number(saved.defense))?boundedRating(Number(saved.defense)):baselineOverall;
+ team.overall=Number.isFinite(Number(team.overall))?boundedRating(Number(team.overall)):baselineOverall;
+ team.attack=Number.isFinite(Number(team.attack))?boundedRating(Number(team.attack)):baselineAttack;
+ team.defense=Number.isFinite(Number(team.defense))?boundedRating(Number(team.defense)):baselineDefense;
+ team.initialRating={overall:baselineOverall,attack:baselineAttack,defense:baselineDefense};
 }
-function selectionRating(team){return {overall:Number(team.overall),attack:Number(team.attack),defense:Number(team.defense)};}
+function selectionRating(team){
+ const overall=Number.isFinite(Number(team?.overall))?boundedRating(Number(team.overall)):50;
+ const attack=Number.isFinite(Number(team?.attack))?boundedRating(Number(team.attack)):overall;
+ const defense=Number.isFinite(Number(team?.defense))?boundedRating(Number(team.defense)):overall;
+ return {overall,attack,defense};
+}
 rankedSelections().forEach(team=>initializeSelectionRating(getNationalTeam(team.id),team.rank));
 saveSelections();
 function selectionMatchExpected(home,away){return 1/(1+Math.pow(10,-((home.points-away.points)/600)));}
@@ -629,7 +632,19 @@ function renderSelectionProfile(id){
  const rating=selectionRating(team);
  const historyRows=(team.history||[]).slice(0,10).map(h=>{const opponent=getNationalTeam(h.opponent);return '<tr><td>'+esc(h.date)+'</td><td>'+flagEmoji(opponent?.iso)+' '+esc(opponent?.name||'Seleção')+'</td><td>'+esc(h.score)+'</td><td class="'+(h.delta>=0?'points-up':'points-down')+'">'+(h.delta>0?'+':'')+Number(h.delta).toFixed(2)+'</td><td>'+Number(h.points).toFixed(2)+'</td></tr>';}).join('');
  view.innerHTML='<div class="selection-profile"><button class="btn btn-secondary selection-back" id="selection-profile-back">← Voltar para seleções</button><div class="selection-profile-hero"><div class="selection-profile-flag">'+flagEmoji(team.iso)+'</div><div class="selection-profile-name"><span class="eyebrow">WFS · SELEÇÃO NACIONAL</span><h2>'+esc(team.name)+'</h2><p>'+esc(team.fifaName)+' · '+esc(CONFEDERATION_NAMES[team.confederation]||team.confederation)+'</p></div><div class="selection-profile-rank"><strong>'+current.rank+'º</strong><span>Ranking mundial</span></div></div><div class="selection-profile-stats"><div><span>Pontuação atual</span><strong>'+Number(team.points).toFixed(2)+'</strong></div><div><span>Jogos registrados</span><strong>'+Number(team.matches||0)+'</strong></div><div><span>Posição anterior</span><strong>'+(previous?previous+'º':'—')+'</strong></div><div><span>Melhor posição registrada</span><strong>'+(history.length?Math.min(...history.map(h=>Number(h.ranks?.[id]||999)))+'º':'—')+'</strong></div></div><section class="panel selection-profile-panel"><div class="panel-head"><div><h3>Força da seleção</h3><p class="muted">Escala de 1 a 100, seguindo o mesmo modelo de avaliação dos clubes. A força esportiva é independente dos pontos do ranking.</p></div></div><form id="selection-rating-form" class="rating-grid"><div class="field"><label for="selection-rating-overall">Força geral</label><input id="selection-rating-overall" type="number" min="1" max="100" value="'+rating.overall+'" required></div><div class="field"><label for="selection-rating-attack">Ataque</label><input id="selection-rating-attack" type="number" min="1" max="100" value="'+rating.attack+'" required></div><div class="field"><label for="selection-rating-defense">Defesa</label><input id="selection-rating-defense" type="number" min="1" max="100" value="'+rating.defense+'" required></div><button class="btn" type="submit">Salvar força</button></form><div class="rating-bars"><div><span>Geral</span><strong>'+rating.overall+'/100</strong><i><b style="width:'+rating.overall+'%"></b></i></div><div><span>Ataque</span><strong>'+rating.attack+'/100</strong><i><b style="width:'+rating.attack+'%"></b></i></div><div><span>Defesa</span><strong>'+rating.defense+'/100</strong><i><b style="width:'+rating.defense+'%"></b></i></div></div></section><section class="panel selection-profile-panel"><div class="panel-head"><div><h3>Evolução no ranking mundial</h3><p class="muted">A posição é registrada após cada partida internacional. Quanto mais alto o ponto no gráfico, melhor a posição.</p></div><span class="tag">ÚLTIMOS '+recent.length+' REGISTROS</span></div>'+chart+'</section><section class="panel selection-profile-panel"><div class="panel-head"><div><h3>Últimas partidas</h3><p class="muted">Resultados e impacto na pontuação da seleção.</p></div></div>'+(historyRows?'<div class="table-wrap"><table class="standings"><thead><tr><th>DATA</th><th>ADVERSÁRIO</th><th>PLACAR</th><th>VARIAÇÃO</th><th>PONTOS</th></tr></thead><tbody>'+historyRows+'</tbody></table></div>':'<div class="empty">Nenhuma partida registrada para esta seleção.</div>')+'</section></div>';
- document.querySelector('#selection-rating-form').addEventListener('submit',e=>{e.preventDefault();const values=['overall','attack','defense'].map(k=>Number(document.querySelector('#selection-rating-'+k).value));if(values.some(v=>!Number.isInteger(v)||v<1||v>100)){alert('Informe valores inteiros entre 1 e 100.');return;}[team.overall,team.attack,team.defense]=values;saveSelections();renderSelectionProfile(id);});
+ const ratingForm=document.querySelector('#selection-rating-form');
+ ratingForm.addEventListener('submit',e=>{
+  e.preventDefault();
+  const values=['overall','attack','defense'].map(k=>Number(ratingForm.elements.namedItem('selection-rating-'+k)?.value));
+  if(values.some(v=>!Number.isInteger(v)||v<1||v>100)){
+   alert('Informe valores inteiros entre 1 e 100 para força geral, ataque e defesa.');
+   return;
+  }
+  [team.overall,team.attack,team.defense]=values;
+  if(!team.initialRating||typeof team.initialRating!=='object')team.initialRating={...selectionRating(team)};
+  saveSelections();
+  renderSelectionProfile(id);
+ });
  document.querySelector('#selection-profile-back').addEventListener('click',()=>{activeSelectionProfileId=null;renderSelections(activeSelectionTab);});
 }
 function selectionRankingTable(list){
