@@ -182,7 +182,7 @@ function updateSelectionRatingsAfterMatch(home,away,homeGoals,awayGoals){
  return {home:Number((home.overall-h.overall).toFixed(2)),away:Number((away.overall-a.overall).toFixed(2))};
 }
 
-function recordInternationalMatch(form){
+function recordInternationalMatch(form,options={}){
  const home=getNationalTeam(form.home.value),away=getNationalTeam(form.away.value);
  const homeGoals=Number(form.homeGoals.value),awayGoals=Number(form.awayGoals.value);
  const type=MATCH_IMPORTANCE.find(x=>x.id===form.matchType.value);
@@ -213,7 +213,7 @@ function recordInternationalMatch(form){
  home.history=home.history||[];away.history=away.history||[];
  home.history.unshift({date,opponent:away.id,score:homeGoals+'–'+awayGoals,delta:match.homeDelta,ratingDelta:ratingChange.home,points:home.points});
  away.history.unshift({date,opponent:home.id,score:awayGoals+'–'+homeGoals,delta:match.awayDelta,ratingDelta:ratingChange.away,points:away.points});
- saveSelections();return true;
+ if(!options.deferSave)saveSelections();return true;
 }
 function selectionTabsHtml(){
  return '<div class="selection-tabs">'+[['ranking','Ranking mundial'],['teams','Seleções'],['matches','Partidas e pontuação'],['competitions','Competições']].map(([id,label])=>'<button class="selection-tab '+(activeSelectionTab===id?'active':'')+'" data-selection-tab="'+id+'">'+label+'</button>').join('')+'</div>';
@@ -628,10 +628,12 @@ function simulateInternationalFriendlyFixtures(){
   const difference=Math.max(-0.65,Math.min(0.65,(home.points-away.points)/900));
   const homeGoals=poissonGoals(Math.max(0.25,1.35+difference+0.12)),awayGoals=poissonGoals(Math.max(0.2,1.15-difference));
   const simulatedForm={home:{value:home.id},away:{value:away.id},homeGoals:{value:String(homeGoals)},awayGoals:{value:String(awayGoals)},matchType:{value:'friendly_inside'},matchDate:{value:date},penaltyWinner:{value:''},knockoutProtection:{checked:false}};
-  if(recordInternationalMatch(simulatedForm)){fixture.homeGoals=homeGoals;fixture.awayGoals=awayGoals;fixture.date=date;}
+  if(recordInternationalMatch(simulatedForm,{deferSave:true})){fixture.homeGoals=homeGoals;fixture.awayGoals=awayGoals;fixture.date=date;}
  });
  internationalFriendlyDraw.simulated=true;internationalFriendlyDraw.simulatedAt=new Date().toISOString();
- localStorage.setItem(FRIENDLY_DRAW_STORE,JSON.stringify(internationalFriendlyDraw));renderSelections('competitions');
+ saveSelections();
+ localStorage.setItem(FRIENDLY_DRAW_STORE,JSON.stringify(internationalFriendlyDraw));
+ renderSelections('competitions');
 }
 function renderSelectionProfile(id){
  const team=getNationalTeam(id);if(!team){activeSelectionProfileId=null;renderSelections(activeSelectionTab);return;}
