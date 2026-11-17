@@ -211,8 +211,8 @@ function recordInternationalMatch(form){
  const rankedAfterMatch=rankedSelections();
  selectionRankHistory.push({date,matchId:match.id,ranks:Object.fromEntries(rankedAfterMatch.map(t=>[t.id,t.rank])),points:Object.fromEntries(rankedAfterMatch.map(t=>[t.id,t.points]))});
  home.history=home.history||[];away.history=away.history||[];
- home.history.unshift({date,opponent:away.id,score:homeGoals+'–'+awayGoals,delta:match.homeDelta,points:home.points});
- away.history.unshift({date,opponent:home.id,score:awayGoals+'–'+homeGoals,delta:match.awayDelta,points:away.points});
+ home.history.unshift({date,opponent:away.id,score:homeGoals+'–'+awayGoals,delta:match.homeDelta,ratingDelta:ratingChange.home,points:home.points});
+ away.history.unshift({date,opponent:home.id,score:awayGoals+'–'+homeGoals,delta:match.awayDelta,ratingDelta:ratingChange.away,points:away.points});
  saveSelections();return true;
 }
 function selectionTabsHtml(){
@@ -438,11 +438,12 @@ function recordWorldCupQualifierResult(match){
  const homeDelta=Number((weight*(homeOutcome-expected)).toFixed(2)),awayDelta=Number((weight*(awayOutcome-(1-expected))).toFixed(2));
  home.points=Number((home.points+homeDelta).toFixed(2));away.points=Number((away.points+awayDelta).toFixed(2));
  home.matches=(home.matches||0)+1;away.matches=(away.matches||0)+1;
- const date=new Date().toISOString().slice(0,10),entry={id:uid(),date,home:home.id,away:away.id,homeGoals:match.homeGoals,awayGoals:match.awayGoals,type:'qualifiers',typeLabel:'Eliminatórias da Copa do Mundo',weight,protectKnockout:false,penaltyWinner:null,homeBefore,awayBefore,homeDelta,awayDelta,homeAfter:home.points,awayAfter:away.points,competition:'Eliminatórias da Copa do Mundo'};
+ const ratingChange=updateSelectionRatingsAfterMatch(home,away,match.homeGoals,match.awayGoals);
+ const date=new Date().toISOString().slice(0,10),entry={id:uid(),date,home:home.id,away:away.id,homeGoals:match.homeGoals,awayGoals:match.awayGoals,type:'qualifiers',typeLabel:'Eliminatórias da Copa do Mundo',weight,protectKnockout:false,penaltyWinner:null,homeBefore,awayBefore,homeDelta,awayDelta,homeAfter:home.points,awayAfter:away.points,homeRatingDelta:ratingChange.home,awayRatingDelta:ratingChange.away,competition:'Eliminatórias da Copa do Mundo'};
  internationalMatches.unshift(entry);
  home.history=home.history||[];away.history=away.history||[];
- home.history.unshift({date,opponent:away.id,score:match.homeGoals+'–'+match.awayGoals,delta:homeDelta,points:home.points});
- away.history.unshift({date,opponent:home.id,score:match.awayGoals+'–'+match.homeGoals,delta:awayDelta,points:away.points});
+ home.history.unshift({date,opponent:away.id,score:match.homeGoals+'–'+match.awayGoals,delta:homeDelta,ratingDelta:ratingChange.home,points:home.points});
+ away.history.unshift({date,opponent:home.id,score:match.awayGoals+'–'+match.homeGoals,delta:awayDelta,ratingDelta:ratingChange.away,points:away.points});
  const ranked=rankedSelections();selectionRankHistory.push({date,matchId:entry.id,ranks:Object.fromEntries(ranked.map(t=>[t.id,t.rank])),points:Object.fromEntries(ranked.map(t=>[t.id,t.points]))});
 }
 function simulateWorldCupQualifierRound(confederation,groupIndex,roundIndex){
