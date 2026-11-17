@@ -256,3 +256,15 @@
 .worldcup-tie-separator{text-align:center;color:var(--muted);font-size:10px;padding:2px}
 @media(max-width:800px){.worldcup-drawn-groups,.worldcup-drawn-ties{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:650px){.worldcup-confed-grid,.worldcup-drawn-groups,.worldcup-drawn-ties{grid-template-columns:1fr}.worldcup-draw-action{align-items:flex-start;flex-direction:column}}
+
+.worldcup-group-open{display:block;width:100%;text-align:left;color:var(--text);background:transparent;font:inherit;cursor:pointer;transition:border-color .15s,transform .15s}
+.worldcup-group-open:hover{border-color:var(--accent);transform:translateY(-1px)}
+.worldcup-group-open>strong{display:block;margin-top:12px;color:var(--accent);font-size:11px}
+.worldcup-group-open>.muted{display:block;margin:0 0 8px;font-size:11px}
+.worldcup-qualifier-page .round-controls{display:flex;justify-content:flex-start;align-items:center;gap:10px;margin-top:14px}
+.worldcup-qualifier-page .round-card{margin-top:12px}
+.worldcup-qualifier-page .fixture{grid-template-columns:minmax(0,1fr) auto minmax(0,1fr)}
+.worldcup-qualifier-page .fixture-team{font-size:12px;overflow-wrap:anywhere}
+.worldcup-qualifier-page .score{min-width:54px;text-align:center}
+.worldcup-qualifier-page .standings{min-width:620px}
+@media(max-width:650px){.worldcup-qualifier-page .fixture{gap:6px}.worldcup-qualifier-page .fixture-team{font-size:10px}.worldcup-qualifier-page .score{min-width:42px}}
