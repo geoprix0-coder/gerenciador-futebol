@@ -268,12 +268,12 @@ function qualifierAllGroupsComplete(groups){
  return !!groups?.length&&groups.every(g=>g.rounds?.length&&g.rounds.every(r=>r.matches.every(m=>m.homeGoals!==null&&m.awayGoals!==null)));
 }
 function qualifierNextPhaseName(confederation,phase){
- const labels={UEFA:{1:'Playoffs'},CAF:{1:'Playoff continental · semifinais',2:'Playoff continental · final'},AFC:{1:'2ª rodada',2:'3ª rodada',3:'4ª rodada',4:'5ª rodada · playoff'},CONCACAF:{1:'Segunda rodada',2:'Rodada final'},OFC:{1:'Fase de grupos',2:'Semifinais',3:'Final'}};
+ const labels={UEFA:{1:'Playoffs · semifinais',2:'Playoffs · finais'},CAF:{1:'Playoff continental · semifinais',2:'Playoff continental · final'},AFC:{1:'2ª rodada',2:'3ª rodada',3:'4ª rodada',4:'5ª rodada · playoff'},CONCACAF:{1:'Segunda rodada',2:'Rodada final'},OFC:{1:'Fase de grupos',2:'Semifinais',3:'Final'}};
  return labels[confederation]?.[phase]||'Próxima fase';
 }
 function qualifierHasNextPhase(confederation,draw){
  const p=Number(draw?.phaseIndex)||0;
- return (confederation==='UEFA'&&p===0)||(confederation==='CAF'&&p<2)||(confederation==='AFC'&&p<4)||(confederation==='CONCACAF'&&p<2)||(confederation==='OFC'&&p<3);
+ return (confederation==='UEFA'&&p<2)||(confederation==='CAF'&&p<2)||(confederation==='AFC'&&p<4)||(confederation==='CONCACAF'&&p<2)||(confederation==='OFC'&&p<3);
 }
 function qualifierStageComplete(draw){
  if(draw.ties)return qualifierAllTiesComplete(draw.ties);
@@ -325,6 +325,7 @@ function advanceWorldCupQualifierPhase(confederation){
   else if(confederation==='OFC'&&current===0)advancing=qualifierGroupWinners(draw.groups,1).slice(0,1).map(r=>r.id);
   else if(confederation==='AFC'&&current===1)advancing=qualifierGroupWinners(draw.groups,2).map(r=>r.id);
   else if(confederation==='AFC'&&current===2){const rows=qualifierGroupWinners(draw.groups,4);advancing=rows.filter(r=>r.groupRank===3||r.groupRank===4).map(r=>r.id);}
+  else if(confederation==='AFC'&&current===3)advancing=qualifierGroupWinners(draw.groups,2).filter(r=>r.groupRank===2).map(r=>r.id);
   else if(confederation==='CONCACAF'&&current===1)advancing=qualifierGroupWinners(draw.groups,2).map(r=>r.id);
   else if(confederation==='OFC'&&current===1)advancing=qualifierGroupWinners(draw.groups,2).map(r=>r.id);
   else if(confederation==='UEFA'&&current===0){
@@ -347,7 +348,8 @@ function drawWorldCupQualifierNextPhase(confederation){
  const draw=worldCupQualifierDraws[confederation];if(!draw?.phasePending||!draw.nextTeams?.length)return;
  const ids=draw.nextTeams.slice(),copy=ids.map(id=>{const t=getNationalTeam(id);return {id:t.id,name:t.name,iso:t.iso};}),phase=draw.phaseIndex;
  draw.phasePending=false;draw.nextTeams=null;draw.phaseName=qualifierNextPhaseName(confederation,phase);
- if(confederation==='UEFA'&&phase===1){draw.phaseName='Playoffs';draw.ties=qualifierMakeTies(ids,true);}
+ if(confederation==='UEFA'&&phase===1){draw.phaseName='Playoffs · semifinais';draw.ties=qualifierMakeTies(ids,true);}
+ else if(confederation==='UEFA'&&phase===2){draw.phaseName='Playoffs · finais';draw.ties=qualifierMakeTies(ids,true);}
  else if(confederation==='CAF'&&phase===1){draw.phaseName='Playoff continental · semifinais';draw.ties=qualifierMakeTies(ids,true);}
  else if(confederation==='CAF'&&phase===2){draw.phaseName='Playoff continental · final';draw.ties=qualifierMakeTies(ids,true);}
  else if(confederation==='AFC'&&phase===1){draw.phaseName='2ª rodada';draw.groups=qualifierMakeGroups(copy,9,4,true,'Grupo');}
